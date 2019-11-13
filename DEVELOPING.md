@@ -5,17 +5,19 @@ For general information about contributing changes, see the
 
 ## How it Works
 
-Describe the internal mechanisms necessary for developers to understand how
-to get started making changes.
+The provider uses the Titan `remote-sdk` to provide interfaces for
+`titan-server` to use. The resulting client and server jars are incorporated
+into the titan-server build.
 
 ## Building
 
-Describe how to build the project.
+Run `gradle build`.
 
 ## Testing
 
-Describe how to test the project.
+Tests are run as part of `gradle build`. Tests can also be explicitly run
+via `gradle test`.
 
 ## Releasing
 
-Describe how to generate new releases.
+Releases are triggered by pushing tags to the master branch.

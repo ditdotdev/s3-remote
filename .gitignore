@@ -1,2 +1,10 @@
+# Build files
+/.gradle
+build
+out
+
+# IDE files
+/.idea
+
 # OS Generated files
 .DS_Store

@@ -1,6 +1,7 @@
-# About this Project
+# Titan S3 Provider
 
-Describe the project for users.
+This is a basic Titan S3 provider. For more information on how it works,
+consult the titan documentation.
 
 ## Contributing
 

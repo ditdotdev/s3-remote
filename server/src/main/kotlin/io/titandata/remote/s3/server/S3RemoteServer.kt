@@ -59,11 +59,10 @@ class S3RemoteServer : RemoteServer {
     }
 
     /**
-     * Validate S3 parameters. Required parameters include (accessKey, secretKey). Optional parameters are
-     * (region, sessionToken).
+     * Validate S3 parameters. All parameters are optional: (accessKey, secretKey, region, sessionToken).
      */
     override fun validateParameters(parameters: Map<String, Any>): Map<String, Any> {
-        util.validateFields(parameters, listOf("accessKey", "secretKey"), listOf("region", "sessionToken"))
+        util.validateFields(parameters, emptyList(), listOf("accessKey", "secretKey", "region", "sessionToken"))
         return parameters
     }
 

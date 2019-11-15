@@ -86,10 +86,9 @@ class S3RemoteServerTest : StringSpec() {
             }
         }
 
-        "validate parameters succeeds with only required properties" {
-            val result = client.validateParameters(mapOf("accessKey" to "access", "secretKey" to "secret"))
-            result["accessKey"] shouldBe "access"
-            result["secretKey"] shouldBe "secret"
+        "validate parameters succeeds with empty properties" {
+            val result = client.validateParameters(emptyMap())
+            result.size shouldBe 0
         }
 
         "validate parameters succeeds with all properties" {
@@ -101,15 +100,9 @@ class S3RemoteServerTest : StringSpec() {
             result["sessionToken"] shouldBe "token"
         }
 
-        "validate parameters fails with missing required property" {
-            shouldThrow<IllegalArgumentException> {
-                client.validateParameters(emptyMap())
-            }
-        }
-
         "validate parameters fails with invalid property" {
             shouldThrow<IllegalArgumentException> {
-                client.validateRemote(mapOf("accessKey" to "access", "secretKey" to "secret", "foo" to "bar"))
+                client.validateRemote(mapOf("foo" to "bar"))
             }
         }
 

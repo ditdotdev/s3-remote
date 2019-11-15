@@ -17,7 +17,7 @@ repositories {
 
 dependencies {
     compile(kotlin("stdlib"))
-    compile("io.titandata:remote-sdk:0.0.4")
+    compile("io.titandata:remote-sdk:0.0.8")
     compile("com.google.code.gson:gson:2.8.6")
     compile("com.amazonaws:aws-java-sdk-s3:1.11.668")
     compile("javax.xml.bind:jaxb-api:2.3.1")

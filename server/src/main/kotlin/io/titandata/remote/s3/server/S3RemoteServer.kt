@@ -8,6 +8,7 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
+import io.titandata.remote.RemoteOperation
 import io.titandata.remote.RemoteServer
 import io.titandata.remote.RemoteServerUtil
 import java.io.ByteArrayInputStream
@@ -40,6 +41,30 @@ class S3RemoteServer : RemoteServer {
 
     override fun getProvider(): String {
         return "s3"
+    }
+
+    /**
+     * Validate a S3 remote. The only required field is "bucket". Optional fields include (path, accessKey,
+     * secretKey, region). If either accessKey or secretKey is specified, then both must be specified.
+     */
+    override fun validateRemote(remote: Map<String, Any>): Map<String, Any> {
+        util.validateFields(remote, listOf("bucket"), listOf("path", "accessKey", "secretKey", "region"))
+
+        if ((!remote.containsKey("accessKey") && remote.containsKey("secretKey")) ||
+                (remote.containsKey("accessKey") && !remote.containsKey("secretKey"))) {
+            throw IllegalArgumentException("Either both access key and secret key must be set, or neither")
+        }
+
+        return remote
+    }
+
+    /**
+     * Validate S3 parameters. Required parameters include (accessKey, secretKey). Optional parameters are
+     * (region, sessionToken).
+     */
+    override fun validateParameters(parameters: Map<String, Any>): Map<String, Any> {
+        util.validateFields(parameters, listOf("accessKey", "secretKey"), listOf("region", "sessionToken"))
+        return parameters
     }
 
     /**
@@ -167,5 +192,17 @@ class S3RemoteServer : RemoteServer {
         }
 
         return util.sortDescending(ret)
+    }
+
+    override fun endOperation(operation: RemoteOperation, isSuccessful: Boolean) {
+        throw NotImplementedError()
+    }
+
+    override fun startOperation(operation: RemoteOperation) {
+        throw NotImplementedError()
+    }
+
+    override fun syncVolume(operation: RemoteOperation, volumeName: String, volumeDescription: String, volumePath: String, scratchPath: String) {
+        throw NotImplementedError()
     }
 }

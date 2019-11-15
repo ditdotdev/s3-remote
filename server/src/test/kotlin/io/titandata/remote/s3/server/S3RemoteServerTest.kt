@@ -25,7 +25,7 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.verify
 import java.io.ByteArrayInputStream
-import java.lang.IllegalArgumentException
+import kotlin.IllegalArgumentException
 
 class S3RemoteServerTest : StringSpec() {
 
@@ -45,6 +45,72 @@ class S3RemoteServerTest : StringSpec() {
     init {
         "get provider returns s3" {
             client.getProvider() shouldBe "s3"
+        }
+
+        "validate remote succeeds with only required properties" {
+            val result = client.validateRemote(mapOf("bucket" to "bucket"))
+            result["bucket"] shouldBe "bucket"
+        }
+
+        "validate remote succeeds with all properties" {
+            val result = client.validateRemote(mapOf("bucket" to "bucket", "secretKey" to "secret",
+                    "accessKey" to "access", "path" to "/path", "region" to "region"))
+            result["bucket"] shouldBe "bucket"
+            result["secretKey"] shouldBe "secret"
+            result["accessKey"] shouldBe "access"
+            result["path"] shouldBe "/path"
+            result["region"] shouldBe "region"
+        }
+
+        "validate remote fails with missing required property" {
+            shouldThrow<IllegalArgumentException> {
+                client.validateRemote(emptyMap())
+            }
+        }
+
+        "validate remote fails with invalid property" {
+            shouldThrow<IllegalArgumentException> {
+                client.validateRemote(mapOf("bucket" to "bucket", "bucketz" to "bucket"))
+            }
+        }
+
+        "validate remote fails if only access key is set" {
+            shouldThrow<IllegalArgumentException> {
+                client.validateRemote(mapOf("bucket" to "bucket", "accessKey" to "access"))
+            }
+        }
+
+        "validate remote fails if only secret key is set" {
+            shouldThrow<IllegalArgumentException> {
+                client.validateRemote(mapOf("bucket" to "bucket", "secretKey" to "secret"))
+            }
+        }
+
+        "validate parameters succeeds with only required properties" {
+            val result = client.validateParameters(mapOf("accessKey" to "access", "secretKey" to "secret"))
+            result["accessKey"] shouldBe "access"
+            result["secretKey"] shouldBe "secret"
+        }
+
+        "validate parameters succeeds with all properties" {
+            val result = client.validateParameters(mapOf("accessKey" to "access", "secretKey" to "secret",
+                    "region" to "region", "sessionToken" to "token"))
+            result["accessKey"] shouldBe "access"
+            result["secretKey"] shouldBe "secret"
+            result["region"] shouldBe "region"
+            result["sessionToken"] shouldBe "token"
+        }
+
+        "validate parameters fails with missing required property" {
+            shouldThrow<IllegalArgumentException> {
+                client.validateParameters(emptyMap())
+            }
+        }
+
+        "validate parameters fails with invalid property" {
+            shouldThrow<IllegalArgumentException> {
+                client.validateRemote(mapOf("accessKey" to "access", "secretKey" to "secret", "foo" to "bar"))
+            }
         }
 
         "get path returns bucket" {

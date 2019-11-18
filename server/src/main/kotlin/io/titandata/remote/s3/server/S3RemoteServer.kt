@@ -1,3 +1,7 @@
+/*
+ * Copyright The Titan Project Contributors.
+ */
+
 package io.titandata.remote.s3.server
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider
@@ -6,13 +10,17 @@ import com.amazonaws.auth.BasicSessionCredentials
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.s3.model.AmazonS3Exception
+import com.amazonaws.services.s3.model.ObjectMetadata
+import com.amazonaws.services.s3.model.PutObjectRequest
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import io.titandata.remote.RemoteOperation
-import io.titandata.remote.RemoteServer
 import io.titandata.remote.RemoteServerUtil
+import io.titandata.remote.archive.ArchiveRemote
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.InputStream
+import java.io.SequenceInputStream
 
 /**
  * The S3 provider is a very simple provider for storing whole commits directly in a S3 bucket. Each commit is is a
@@ -33,7 +41,7 @@ import java.io.InputStream
  * concurrent operations creating invalid state, but those are existing challenges with these simplistic providers.
  * Properly solving them would require a more sophisticated provider with server-side logic.
  */
-class S3RemoteServer : RemoteServer {
+class S3RemoteServer : ArchiveRemote() {
 
     private val METADATA_PROP = "io.titan-data"
     internal val gson = GsonBuilder().create()
@@ -67,7 +75,7 @@ class S3RemoteServer : RemoteServer {
     }
 
     /**
-     * Get an instance of the S3 client based on the remote configuration and parameters.
+     * Get an instance of the S3 client based on the remote configuration and parameters. Public for testing purposes.
      */
     fun getClient(remote: Map<String, Any>, parameters: Map<String, Any>): AmazonS3 {
         val accessKey = (parameters.get("accessKey") ?: remote["accessKey"]
@@ -89,9 +97,9 @@ class S3RemoteServer : RemoteServer {
 
     /**
      * This function will return the (bucket, key) that identifies the given commit (or root key if no commit
-     * is specified). This takes into the account the optional path configured in the remote.
+     * is specified). This takes into the account the optional path configured in the remote. Public for testing.
      */
-    internal fun getPath(remote: Map<String, Any>, commitId: String? = null): Pair<String, String?> {
+    fun getPath(remote: Map<String, Any>, commitId: String? = null): Pair<String, String?> {
         val key = if (remote["path"] == null) {
             commitId
         } else if (commitId == null) {
@@ -193,15 +201,96 @@ class S3RemoteServer : RemoteServer {
         return util.sortDescending(ret)
     }
 
-    override fun endOperation(operation: RemoteOperation, isSuccessful: Boolean) {
-        throw NotImplementedError()
+    internal fun appendMetadata(remote: Map<String, Any>, params: Map<String, Any>, json: String) {
+        val s3 = getClient(remote, params)
+        val (bucket, key) = getPath(remote)
+        var length = 0L
+        var currentMetadata: InputStream
+        try {
+            val obj = s3.getObject(bucket, getMetadataKey(key))
+            currentMetadata = obj.objectContent
+            length = obj.objectMetadata.contentLength
+        } catch (e: AmazonS3Exception) {
+            if (e.statusCode == 404) {
+                currentMetadata = ByteArrayInputStream("".toByteArray())
+            } else {
+                throw e
+            }
+        }
+
+        val appendStream = ByteArrayInputStream("$json\n".toByteArray())
+        val stream = SequenceInputStream(currentMetadata, appendStream)
+        var objectMetadata = ObjectMetadata()
+        objectMetadata.contentLength = length + json.length + 1
+        s3.putObject(PutObjectRequest(bucket, getMetadataKey(key), stream, objectMetadata))
+    }
+
+    // There is no efficient way to do this, simply read all the commits, update the one in question, and upload
+    internal fun updateMetadata(remote: Map<String, Any>, params: Map<String, Any>, commitId: String, commit: Map<String, Any>) {
+        val s3 = getClient(remote, params)
+        val (bucket, key) = getPath(remote)
+        val originalCommits = listCommits(remote, params, emptyList())
+        val metadata = originalCommits.map {
+            if (it.first == commitId) {
+                gson.toJson(mapOf("id" to it.first, "properties" to commit))
+            } else {
+                gson.toJson(mapOf("id" to it.first, "properties" to it.second))
+            }
+        }.joinToString("\n") + "\n"
+
+        s3.putObject(bucket, getMetadataKey(key), metadata)
+    }
+
+    class S3Operation(provider: S3RemoteServer, operation: RemoteOperation) {
+        val s3: AmazonS3
+        val bucket: String
+        val key: String?
+
+        init {
+            s3 = provider.getClient(operation.remote, operation.parameters)
+            val path = provider.getPath(operation.remote, operation.commitId)
+            bucket = path.first
+            key = path.second
+        }
     }
 
     override fun startOperation(operation: RemoteOperation) {
-        throw NotImplementedError()
+        operation.data = S3Operation(this, operation)
     }
 
-    override fun syncVolume(operation: RemoteOperation, volumeName: String, volumeDescription: String, volumePath: String, scratchPath: String) {
-        throw NotImplementedError()
+    override fun endOperation(operation: RemoteOperation, isSuccessful: Boolean) {
+        // Nothing to do
+    }
+
+    override fun pullArchive(operation: RemoteOperation, volume: String, archive: File) {
+        val data = operation.data as S3Operation
+        val obj = data.s3.getObject(data.bucket, "${data.key}/$volume.tar.gz")
+        obj.objectContent.use { input ->
+            archive.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+    }
+
+    override fun pushArchive(operation: RemoteOperation, volume: String, archive: File) {
+        val data = operation.data as S3Operation
+        data.s3.putObject(data.bucket, "${data.key}/$volume.tar.gz", archive)
+    }
+
+    override fun pushMetadata(operation: RemoteOperation, commit: Map<String, Any>, isUpdate: Boolean) {
+        val data = operation.data as S3Operation
+        val metadata = ObjectMetadata()
+        val json = gson.toJson(mapOf("id" to operation.commitId, "properties" to commit))
+        metadata.userMetadata = mapOf(METADATA_PROP to json)
+        metadata.contentLength = 0
+        val input = ByteArrayInputStream("".toByteArray())
+        val request = PutObjectRequest(data.bucket, data.key, input, metadata)
+        data.s3.putObject(request)
+
+        if (isUpdate) {
+            updateMetadata(operation.remote, operation.parameters, operation.commitId, commit)
+        } else {
+            appendMetadata(operation.remote, operation.parameters, json)
+        }
     }
 }

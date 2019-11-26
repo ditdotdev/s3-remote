@@ -5,6 +5,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 
+apply(plugin="com.github.ben-manes.versions")
+
 buildscript {
     repositories {
         mavenCentral()
@@ -13,7 +15,23 @@ buildscript {
 
     dependencies {
         classpath("com.github.ben-manes:gradle-versions-plugin:0.27.0")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.3.50")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.3.60")
+    }
+}
+
+// Configuration for dependencyUpdates task to ignore release candidates
+tasks.withType<DependencyUpdatesTask>().configureEach {
+    resolutionStrategy {
+        componentSelection {
+            all {
+                val rejected = listOf("alpha", "beta", "rc", "cr", "m", "preview", "b", "ea", "eap").any { qualifier ->
+                    candidate.version.matches(Regex("(?i).*[.-]$qualifier[.\\d-+]*"))
+                }
+                if (rejected) {
+                    reject("Release candidate")
+                }
+            }
+        }
     }
 }
 
@@ -36,22 +54,6 @@ subprojects {
         kotlinOptions {
             jvmTarget = "1.8"
             allWarningsAsErrors = true
-        }
-    }
-
-    // Configuration for dependencyUpdates task to ignore release candidates
-    tasks.withType<DependencyUpdatesTask>().configureEach {
-        resolutionStrategy {
-            componentSelection {
-            	all {
-            	    val rejected = listOf("alpha", "beta", "rc", "cr", "m", "preview", "b", "ea", "eap").any { qualifier ->
-                		candidate.version.matches(Regex("(?i).*[.-]$qualifier[.\\d-+]*"))
-            	    }
-            	    if (rejected) {
-                		reject("Release candidate")
-            	    }
-            	}
-            }
         }
     }
 

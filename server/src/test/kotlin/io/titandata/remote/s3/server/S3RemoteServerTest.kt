@@ -51,8 +51,7 @@ class S3RemoteServerTest : StringSpec() {
             operationId = "operation",
             commitId = "commit",
             commit = null,
-            type = RemoteOperationType.PUSH,
-            data = null
+            type = RemoteOperationType.PUSH
     )
 
     override fun beforeTest(testCase: TestCase) {
@@ -392,22 +391,21 @@ class S3RemoteServerTest : StringSpec() {
             }
         }
 
-        "start operation sets data object" {
+        "sync data start returns data object" {
             every { server.getClient(any(), any()) } returns mockk()
-            server.startOperation(operation)
-            val data = operation.data as S3RemoteServer.S3Operation
+            val data = server.syncDataStart(operation) as S3RemoteServer.S3Operation
             data.bucket shouldBe "bucket"
             data.key shouldBe "path/commit"
         }
 
-        "end operation does nothing" {
-            server.endOperation(operation, true)
+        "sync data end does nothing" {
+            server.syncDataEnd(operation, null, true)
         }
 
         "pull archive writes contents to file" {
             val s3: AmazonS3Client = mockk()
             every { server.getClient(any(), any()) } returns s3
-            operation.data = S3RemoteServer.S3Operation(
+            val data = S3RemoteServer.S3Operation(
                     provider = server,
                     operation = operation)
             val obj: S3Object = mockk()
@@ -415,7 +413,7 @@ class S3RemoteServerTest : StringSpec() {
             every { obj.objectContent } returns S3ObjectInputStream(ByteArrayInputStream("test".toByteArray()), null)
 
             val file = createTempFile()
-            server.pullArchive(operation, "volume", file)
+            server.pullArchive(operation, data, "volume", file)
 
             val contents = file.readText()
             contents shouldBe "test"
@@ -428,13 +426,13 @@ class S3RemoteServerTest : StringSpec() {
         "push archive succeeds" {
             val s3: AmazonS3Client = mockk()
             every { server.getClient(any(), any()) } returns s3
-            operation.data = S3RemoteServer.S3Operation(
+            val data = S3RemoteServer.S3Operation(
                     provider = server,
                     operation = operation)
             every { s3.putObject(any<String>(), any<String>(), any<File>()) } returns mockk()
 
             val file = createTempFile()
-            server.pushArchive(operation, "volume", file)
+            server.pushArchive(operation, data, "volume", file)
 
             verify {
                 s3.putObject("bucket", "path/commit/volume.tar.gz", any<File>())
@@ -444,9 +442,6 @@ class S3RemoteServerTest : StringSpec() {
         "push metadata with update calls update metadata" {
             val s3: AmazonS3Client = mockk()
             every { server.getClient(any(), any()) } returns s3
-            operation.data = S3RemoteServer.S3Operation(
-                    provider = server,
-                    operation = operation)
             val slot = slot<PutObjectRequest>()
             every { s3.putObject(capture(slot)) } returns mockk()
             every { server.updateMetadata(any(), any(), any(), any()) } just Runs
@@ -465,9 +460,6 @@ class S3RemoteServerTest : StringSpec() {
         "push metadata without update calls append metadata" {
             val s3: AmazonS3Client = mockk()
             every { server.getClient(any(), any()) } returns s3
-            operation.data = S3RemoteServer.S3Operation(
-                    provider = server,
-                    operation = operation)
             val slot = slot<PutObjectRequest>()
             every { s3.putObject(capture(slot)) } returns mockk()
             every { server.appendMetadata(any(), any(), any()) } just Runs

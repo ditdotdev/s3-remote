@@ -254,16 +254,16 @@ class S3RemoteServer : ArchiveRemote() {
         }
     }
 
-    override fun startOperation(operation: RemoteOperation) {
-        operation.data = S3Operation(this, operation)
+    override fun syncDataStart(operation: RemoteOperation): Any? {
+        return S3Operation(this, operation)
     }
 
-    override fun endOperation(operation: RemoteOperation, isSuccessful: Boolean) {
+    override fun syncDataEnd(operation: RemoteOperation, operationData: Any?, isSuccessful: Boolean) {
         // Nothing to do
     }
 
-    override fun pullArchive(operation: RemoteOperation, volume: String, archive: File) {
-        val data = operation.data as S3Operation
+    override fun pullArchive(operation: RemoteOperation, operationData: Any?, volume: String, archive: File) {
+        val data = operationData as S3Operation
         val obj = data.s3.getObject(data.bucket, "${data.key}/$volume.tar.gz")
         obj.objectContent.use { input ->
             archive.outputStream().use { output ->
@@ -272,13 +272,13 @@ class S3RemoteServer : ArchiveRemote() {
         }
     }
 
-    override fun pushArchive(operation: RemoteOperation, volume: String, archive: File) {
-        val data = operation.data as S3Operation
+    override fun pushArchive(operation: RemoteOperation, operationData: Any?, volume: String, archive: File) {
+        val data = operationData as S3Operation
         data.s3.putObject(data.bucket, "${data.key}/$volume.tar.gz", archive)
     }
 
     override fun pushMetadata(operation: RemoteOperation, commit: Map<String, Any>, isUpdate: Boolean) {
-        val data = operation.data as S3Operation
+        val data = S3Operation(this, operation)
         val metadata = ObjectMetadata()
         val json = gson.toJson(mapOf("id" to operation.commitId, "properties" to commit))
         metadata.userMetadata = mapOf(METADATA_PROP to json)

@@ -6,10 +6,10 @@ package io.titandata.remote.s3.client
 
 import io.titandata.remote.RemoteClient
 import io.titandata.remote.RemoteClientUtil
-import java.net.URI
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain
+import java.net.URI
 
 /**
  * The URI syntax for S3 remotes is:
@@ -34,7 +34,10 @@ class S3RemoteClient : RemoteClient {
         return "s3"
     }
 
-    override fun parseUri(uri: URI, additionalProperties: Map<String, String>): Map<String, Any> {
+    override fun parseUri(
+        uri: URI,
+        additionalProperties: Map<String, String>,
+    ): Map<String, Any> {
         val (username, password, bucket, port, path) = util.getConnectionInfo(uri)
 
         if (password != null) {
@@ -69,10 +72,11 @@ class S3RemoteClient : RemoteClient {
             throw IllegalArgumentException("Either both access key and secret key must be set, or neither in S3 remote")
         }
 
-        val objectPath = when {
-            path != null && path.startsWith("/") -> path.substring(1)
-            else -> path
-        }
+        val objectPath =
+            when {
+                path != null && path.startsWith("/") -> path.substring(1)
+                else -> path
+            }
 
         val result = mutableMapOf("bucket" to bucket)
         if (objectPath != null) {
@@ -115,7 +119,7 @@ class S3RemoteClient : RemoteClient {
         var secretKey = remoteProperties["secretKey"] as String?
         var sessionToken: String? = null
         if (accessKey == null || secretKey == null) {
-            val creds = DefaultCredentialsProvider.create().resolveCredentials()
+            val creds = DefaultCredentialsProvider.builder().build().resolveCredentials()
             if (creds == null) {
                 throw IllegalArgumentException("Unable to determine AWS credentials")
             }

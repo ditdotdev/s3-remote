@@ -5,6 +5,9 @@
 #
 # We run a full build (including lint) on each pull request.
 #
+#
+# Build and test on pull request - updated to force recognition
+#
 name: Pull Request
 
 on:

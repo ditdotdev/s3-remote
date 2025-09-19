@@ -12,7 +12,6 @@ plugins {
 repositories {
     mavenLocal()
     mavenCentral()
-    jcenter()
     maven("https://dl.bintray.com/kotlin/kotlinx")
     maven {
         name = "titan"
@@ -21,13 +20,13 @@ repositories {
 }
 
 dependencies {
-    compile(kotlin("stdlib"))
-    compile("io.titandata:remote-sdk:0.2.0")
-    compile("com.google.code.gson:gson:2.8.6")
-    compile("com.amazonaws:aws-java-sdk-s3:1.11.682")
-    compile("javax.xml.bind:jaxb-api:2.3.1")
+    implementation(kotlin("stdlib"))
+    implementation("io.titandata:remote-sdk:0.2.0")
+    implementation("com.google.code.gson:gson:2.13.2")
+    implementation("com.amazonaws:aws-java-sdk-s3:1.12.791")
+    implementation("javax.xml.bind:jaxb-api:2.3.1")
     testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
-    testImplementation("io.mockk:mockk:1.9.3")
+    testImplementation("io.mockk:mockk:1.14.5")
 }
 
 // Jar configuration

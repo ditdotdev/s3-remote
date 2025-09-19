@@ -42,8 +42,7 @@ import java.io.SequenceInputStream
  * Properly solving them would require a more sophisticated provider with server-side logic.
  */
 class S3RemoteServer : ArchiveRemote() {
-
-    private val METADATA_PROP = "io.titan-data"
+    private val metadataProp = "io.titan-data"
     internal val gson = GsonBuilder().create()
     internal val util = RemoteServerUtil()
 
@@ -59,7 +58,8 @@ class S3RemoteServer : ArchiveRemote() {
         util.validateFields(remote, listOf("bucket"), listOf("path", "accessKey", "secretKey", "region"))
 
         if ((!remote.containsKey("accessKey") && remote.containsKey("secretKey")) ||
-                (remote.containsKey("accessKey") && !remote.containsKey("secretKey"))) {
+            (remote.containsKey("accessKey") && !remote.containsKey("secretKey"))
+        ) {
             throw IllegalArgumentException("Either both access key and secret key must be set, or neither")
         }
 
@@ -77,19 +77,32 @@ class S3RemoteServer : ArchiveRemote() {
     /**
      * Get an instance of the S3 client based on the remote configuration and parameters. Public for testing purposes.
      */
-    fun getClient(remote: Map<String, Any>, parameters: Map<String, Any>): AmazonS3 {
-        val accessKey = (parameters.get("accessKey") ?: remote["accessKey"]
-            ?: throw IllegalArgumentException("missing access key")) as String
-        val secretKey = (parameters.get("secretKey") ?: remote["secretKey"]
-            ?: throw IllegalArgumentException("missing secret key")) as String
-        val region = (parameters.get("region") ?: remote["region"]
-            ?: throw IllegalArgumentException("missing region")) as String
+    fun getClient(
+        remote: Map<String, Any>,
+        parameters: Map<String, Any>,
+    ): AmazonS3 {
+        val accessKey =
+            (
+                parameters.get("accessKey") ?: remote["accessKey"]
+                    ?: throw IllegalArgumentException("missing access key")
+            ) as String
+        val secretKey =
+            (
+                parameters.get("secretKey") ?: remote["secretKey"]
+                    ?: throw IllegalArgumentException("missing secret key")
+            ) as String
+        val region =
+            (
+                parameters.get("region") ?: remote["region"]
+                    ?: throw IllegalArgumentException("missing region")
+            ) as String
 
-        val creds = if (parameters.containsKey("sessionToken")) {
-            BasicSessionCredentials(accessKey, secretKey, parameters.get("sessionToken").toString())
-        } else {
-            BasicAWSCredentials(accessKey, secretKey)
-        }
+        val creds =
+            if (parameters.containsKey("sessionToken")) {
+                BasicSessionCredentials(accessKey, secretKey, parameters.get("sessionToken").toString())
+            } else {
+                BasicAWSCredentials(accessKey, secretKey)
+            }
         val provider = AWSStaticCredentialsProvider(creds)
 
         return AmazonS3ClientBuilder.standard().withCredentials(provider).withRegion(region).build()!!
@@ -99,14 +112,18 @@ class S3RemoteServer : ArchiveRemote() {
      * This function will return the (bucket, key) that identifies the given commit (or root key if no commit
      * is specified). This takes into the account the optional path configured in the remote. Public for testing.
      */
-    fun getPath(remote: Map<String, Any>, commitId: String? = null): Pair<String, String?> {
-        val key = if (remote["path"] == null) {
-            commitId
-        } else if (commitId == null) {
-            remote["path"] as String
-        } else {
-            "${remote["path"]}/$commitId"
-        }
+    fun getPath(
+        remote: Map<String, Any>,
+        commitId: String? = null,
+    ): Pair<String, String?> {
+        val key =
+            if (remote["path"] == null) {
+                commitId
+            } else if (commitId == null) {
+                remote["path"] as String
+            } else {
+                "${remote["path"]}/$commitId"
+            }
 
         return Pair(remote["bucket"] as String, key)
     }
@@ -127,7 +144,10 @@ class S3RemoteServer : ArchiveRemote() {
      * Helper function that fetches the content of the metadata file as an input stream. Returns an empty file if
      * it doesn't yet exist.
      */
-    internal fun getMetadataContent(remote: Map<String, Any>, parameters: Map<String, Any>): InputStream {
+    internal fun getMetadataContent(
+        remote: Map<String, Any>,
+        parameters: Map<String, Any>,
+    ): InputStream {
         val s3 = getClient(remote, parameters)
         val (bucket, key) = getPath(remote)
 
@@ -147,15 +167,19 @@ class S3RemoteServer : ArchiveRemote() {
      * "io.titan-data". For historical reasons, we keep the metadata within the "properties" sub-object. This
      * matches how it's stored in the top-level metadata file.
      */
-    override fun getCommit(remote: Map<String, Any>, parameters: Map<String, Any>, commitId: String): Map<String, Any>? {
+    override fun getCommit(
+        remote: Map<String, Any>,
+        parameters: Map<String, Any>,
+        commitId: String,
+    ): Map<String, Any>? {
         val s3 = getClient(remote, parameters)
         val (bucket, key) = getPath(remote, commitId)
         try {
             val obj = s3.getObjectMetadata(bucket, key)
-            if (obj.userMetadata == null || !obj.userMetadata.containsKey(METADATA_PROP)) {
+            if (obj.userMetadata == null || !obj.userMetadata.containsKey(metadataProp)) {
                 return null
             }
-            val metadata: Map<String, Any> = gson.fromJson(obj.userMetadata[METADATA_PROP], object : TypeToken<Map<String, Any>>() {}.type)
+            val metadata: Map<String, Any> = gson.fromJson(obj.userMetadata[metadataProp], object : TypeToken<Map<String, Any>>() {}.type)
 
             if (!metadata.containsKey("properties")) {
                 return null
@@ -174,7 +198,11 @@ class S3RemoteServer : ArchiveRemote() {
      * List all commits in a repository. This operates by processing the metadata file at the root of the S3 path. Each
      * line is a JSON object with an "id" field and "properties" field.
      */
-    override fun listCommits(remote: Map<String, Any>, parameters: Map<String, Any>, tags: List<Pair<String, String?>>): List<Pair<String, Map<String, Any>>> {
+    override fun listCommits(
+        remote: Map<String, Any>,
+        parameters: Map<String, Any>,
+        tags: List<Pair<String, String?>>,
+    ): List<Pair<String, Map<String, Any>>> {
         val ret = mutableListOf<Pair<String, Map<String, Any>>>()
         val metadata = getMetadataContent(remote, parameters)
 
@@ -201,7 +229,11 @@ class S3RemoteServer : ArchiveRemote() {
         return util.sortDescending(ret)
     }
 
-    internal fun appendMetadata(remote: Map<String, Any>, params: Map<String, Any>, json: String) {
+    internal fun appendMetadata(
+        remote: Map<String, Any>,
+        params: Map<String, Any>,
+        json: String,
+    ) {
         val s3 = getClient(remote, params)
         val (bucket, key) = getPath(remote)
         var length = 0L
@@ -226,17 +258,23 @@ class S3RemoteServer : ArchiveRemote() {
     }
 
     // There is no efficient way to do this, simply read all the commits, update the one in question, and upload
-    internal fun updateMetadata(remote: Map<String, Any>, params: Map<String, Any>, commitId: String, commit: Map<String, Any>) {
+    internal fun updateMetadata(
+        remote: Map<String, Any>,
+        params: Map<String, Any>,
+        commitId: String,
+        commit: Map<String, Any>,
+    ) {
         val s3 = getClient(remote, params)
         val (bucket, key) = getPath(remote)
         val originalCommits = listCommits(remote, params, emptyList())
-        val metadata = originalCommits.map {
-            if (it.first == commitId) {
-                gson.toJson(mapOf("id" to it.first, "properties" to commit))
-            } else {
-                gson.toJson(mapOf("id" to it.first, "properties" to it.second))
-            }
-        }.joinToString("\n") + "\n"
+        val metadata =
+            originalCommits.map {
+                if (it.first == commitId) {
+                    gson.toJson(mapOf("id" to it.first, "properties" to commit))
+                } else {
+                    gson.toJson(mapOf("id" to it.first, "properties" to it.second))
+                }
+            }.joinToString("\n") + "\n"
 
         s3.putObject(bucket, getMetadataKey(key), metadata)
     }
@@ -258,11 +296,20 @@ class S3RemoteServer : ArchiveRemote() {
         return S3Operation(this, operation)
     }
 
-    override fun syncDataEnd(operation: RemoteOperation, operationData: Any?, isSuccessful: Boolean) {
+    override fun syncDataEnd(
+        operation: RemoteOperation,
+        operationData: Any?,
+        isSuccessful: Boolean,
+    ) {
         // Nothing to do
     }
 
-    override fun pullArchive(operation: RemoteOperation, operationData: Any?, volume: String, archive: File) {
+    override fun pullArchive(
+        operation: RemoteOperation,
+        operationData: Any?,
+        volume: String,
+        archive: File,
+    ) {
         val data = operationData as S3Operation
         val obj = data.s3.getObject(data.bucket, "${data.key}/$volume.tar.gz")
         obj.objectContent.use { input ->
@@ -272,16 +319,25 @@ class S3RemoteServer : ArchiveRemote() {
         }
     }
 
-    override fun pushArchive(operation: RemoteOperation, operationData: Any?, volume: String, archive: File) {
+    override fun pushArchive(
+        operation: RemoteOperation,
+        operationData: Any?,
+        volume: String,
+        archive: File,
+    ) {
         val data = operationData as S3Operation
         data.s3.putObject(data.bucket, "${data.key}/$volume.tar.gz", archive)
     }
 
-    override fun pushMetadata(operation: RemoteOperation, commit: Map<String, Any>, isUpdate: Boolean) {
+    override fun pushMetadata(
+        operation: RemoteOperation,
+        commit: Map<String, Any>,
+        isUpdate: Boolean,
+    ) {
         val data = S3Operation(this, operation)
         val metadata = ObjectMetadata()
         val json = gson.toJson(mapOf("id" to operation.commitId, "properties" to commit))
-        metadata.userMetadata = mapOf(METADATA_PROP to json)
+        metadata.userMetadata = mapOf(metadataProp to json)
         metadata.contentLength = 0
         val input = ByteArrayInputStream("".toByteArray())
         val request = PutObjectRequest(data.bucket, data.key, input, metadata)

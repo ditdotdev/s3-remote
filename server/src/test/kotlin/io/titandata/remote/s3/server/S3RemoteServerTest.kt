@@ -38,27 +38,31 @@ import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.File
 import kotlin.IllegalArgumentException
+import kotlin.io.path.createTempFile
 
 class S3RemoteServerTest : StringSpec() {
-
     @SpyK
     var server = S3RemoteServer()
 
-    val operation = RemoteOperation(
+    val operation =
+        RemoteOperation(
             updateProgress = { _: RemoteProgress, _: String?, _: Int? -> Unit },
             remote = mapOf("bucket" to "bucket", "path" to "path"),
             parameters = emptyMap(),
             operationId = "operation",
             commitId = "commit",
             commit = null,
-            type = RemoteOperationType.PUSH
-    )
+            type = RemoteOperationType.PUSH,
+        )
 
     override fun beforeTest(testCase: TestCase) {
         return MockKAnnotations.init(this)
     }
 
-    override fun afterTest(testCase: TestCase, result: TestResult) {
+    override fun afterTest(
+        testCase: TestCase,
+        result: TestResult,
+    ) {
         clearAllMocks()
     }
 
@@ -75,8 +79,16 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "validate remote succeeds with all properties" {
-            val result = server.validateRemote(mapOf("bucket" to "bucket", "secretKey" to "secret",
-                    "accessKey" to "access", "path" to "/path", "region" to "region"))
+            val result =
+                server.validateRemote(
+                    mapOf(
+                        "bucket" to "bucket",
+                        "secretKey" to "secret",
+                        "accessKey" to "access",
+                        "path" to "/path",
+                        "region" to "region",
+                    ),
+                )
             result["bucket"] shouldBe "bucket"
             result["secretKey"] shouldBe "secret"
             result["accessKey"] shouldBe "access"
@@ -114,8 +126,15 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "validate parameters succeeds with all properties" {
-            val result = server.validateParameters(mapOf("accessKey" to "access", "secretKey" to "secret",
-                    "region" to "region", "sessionToken" to "token"))
+            val result =
+                server.validateParameters(
+                    mapOf(
+                        "accessKey" to "access",
+                        "secretKey" to "secret",
+                        "region" to "region",
+                        "sessionToken" to "token",
+                    ),
+                )
             result["accessKey"] shouldBe "access"
             result["secretKey"] shouldBe "secret"
             result["region"] shouldBe "region"
@@ -195,7 +214,10 @@ class S3RemoteServerTest : StringSpec() {
             every { builder.withCredentials(capture(slot)) } returns builder
             every { builder.build() } returns mockk()
 
-            server.getClient(mapOf("accessKey" to "accessKey", "secretKey" to "secretKey", "region" to "region"), mapOf("sessionToken" to "token"))
+            server.getClient(
+                mapOf("accessKey" to "accessKey", "secretKey" to "secretKey", "region" to "region"),
+                mapOf("sessionToken" to "token"),
+            )
 
             val creds = slot.captured
             creds.credentials.awsAccessKeyId shouldBe "accessKey"
@@ -315,10 +337,14 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "list commits filters result" {
-            every { server.getMetadataContent(any(), any()) } returns ByteArrayInputStream(
-                    arrayOf("{\"id\":\"a\",\"properties\":{\"tags\":{\"c\":\"d\"}}}",
-                            "{\"id\":\"b\",\"properties\":{}}")
-                            .joinToString("\n").toByteArray())
+            every { server.getMetadataContent(any(), any()) } returns
+                ByteArrayInputStream(
+                    arrayOf(
+                        "{\"id\":\"a\",\"properties\":{\"tags\":{\"c\":\"d\"}}}",
+                        "{\"id\":\"b\",\"properties\":{}}",
+                    )
+                        .joinToString("\n").toByteArray(),
+                )
             val result = server.listCommits(emptyMap(), emptyMap(), listOf("c" to null))
             result.size shouldBe 1
             result[0].first shouldBe "a"
@@ -337,8 +363,11 @@ class S3RemoteServerTest : StringSpec() {
             val slot = slot<PutObjectRequest>()
             every { s3.putObject(capture(slot)) } returns mockk()
 
-            server.appendMetadata(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(),
-                    "{\"id\":\"b\",\"properties\":{})")
+            server.appendMetadata(
+                mapOf("bucket" to "bucket", "path" to "path"),
+                emptyMap(),
+                "{\"id\":\"b\",\"properties\":{})",
+            )
             slot.captured.bucketName shouldBe "bucket"
             slot.captured.key shouldBe "path/titan"
             val newContent = slot.captured.inputStream.bufferedReader().use(BufferedReader::readText)
@@ -354,8 +383,11 @@ class S3RemoteServerTest : StringSpec() {
             val slot = slot<PutObjectRequest>()
             every { s3.putObject(capture(slot)) } returns mockk()
 
-            server.appendMetadata(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(),
-                    "{\"id\":\"b\",\"properties\":{}}")
+            server.appendMetadata(
+                mapOf("bucket" to "bucket", "path" to "path"),
+                emptyMap(),
+                "{\"id\":\"b\",\"properties\":{}}",
+            )
             slot.captured.bucketName shouldBe "bucket"
             slot.captured.key shouldBe "path/titan"
             val newContent = slot.captured.inputStream.bufferedReader().use(BufferedReader::readText)
@@ -370,24 +402,36 @@ class S3RemoteServerTest : StringSpec() {
             every { server.getClient(any(), any()) } returns s3
 
             shouldThrow<AmazonS3Exception> {
-                server.appendMetadata(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(),
-                        "{\"id\":\"b\",\"properties\":{}}")
+                server.appendMetadata(
+                    mapOf("bucket" to "bucket", "path" to "path"),
+                    emptyMap(),
+                    "{\"id\":\"b\",\"properties\":{}}",
+                )
             }
         }
 
         "update metadata replaces content" {
             val s3: AmazonS3Client = mockk()
             every { server.getClient(any(), any()) } returns s3
-            every { server.listCommits(any(), any(), any()) } returns listOf(
-                "a" to emptyMap(), "b" to emptyMap())
+            every { server.listCommits(any(), any(), any()) } returns
+                listOf(
+                    "a" to emptyMap(), "b" to emptyMap(),
+                )
             every { s3.putObject(any<String>(), any<String>(), any<String>()) } returns mockk()
 
-            server.updateMetadata(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(),
-                    "a", mapOf("x" to "y"))
+            server.updateMetadata(
+                mapOf("bucket" to "bucket", "path" to "path"),
+                emptyMap(),
+                "a",
+                mapOf("x" to "y"),
+            )
 
             verify {
-                s3.putObject("bucket", "path/titan",
-                        "{\"id\":\"a\",\"properties\":{\"x\":\"y\"}}\n{\"id\":\"b\",\"properties\":{}}\n")
+                s3.putObject(
+                    "bucket",
+                    "path/titan",
+                    "{\"id\":\"a\",\"properties\":{\"x\":\"y\"}}\n{\"id\":\"b\",\"properties\":{}}\n",
+                )
             }
         }
 
@@ -405,14 +449,16 @@ class S3RemoteServerTest : StringSpec() {
         "pull archive writes contents to file" {
             val s3: AmazonS3Client = mockk()
             every { server.getClient(any(), any()) } returns s3
-            val data = S3RemoteServer.S3Operation(
+            val data =
+                S3RemoteServer.S3Operation(
                     provider = server,
-                    operation = operation)
+                    operation = operation,
+                )
             val obj: S3Object = mockk()
             every { s3.getObject(any<String>(), any<String>()) } returns obj
             every { obj.objectContent } returns S3ObjectInputStream(ByteArrayInputStream("test".toByteArray()), null)
 
-            val file = createTempFile()
+            val file = createTempFile().toFile()
             server.pullArchive(operation, data, "volume", file)
 
             val contents = file.readText()
@@ -426,12 +472,14 @@ class S3RemoteServerTest : StringSpec() {
         "push archive succeeds" {
             val s3: AmazonS3Client = mockk()
             every { server.getClient(any(), any()) } returns s3
-            val data = S3RemoteServer.S3Operation(
+            val data =
+                S3RemoteServer.S3Operation(
                     provider = server,
-                    operation = operation)
+                    operation = operation,
+                )
             every { s3.putObject(any<String>(), any<String>(), any<File>()) } returns mockk()
 
-            val file = createTempFile()
+            val file = createTempFile().toFile()
             server.pushArchive(operation, data, "volume", file)
 
             verify {

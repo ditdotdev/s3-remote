@@ -14,8 +14,8 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.github.ben-manes:gradle-versions-plugin:0.27.0")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.3.60")
+        classpath("com.github.ben-manes:gradle-versions-plugin:0.52.0")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20")
     }
 }
 
@@ -46,14 +46,14 @@ subprojects {
     val ktlint by configurations.creating
 
     dependencies {
-        ktlint("com.pinterest:ktlint:0.35.0")
+        ktlint("com.pinterest:ktlint:0.51.0-FINAL")
     }
 
     // Treat all warnings as errors
     tasks.withType<KotlinCompile>().configureEach {
-        kotlinOptions {
-            jvmTarget = "1.8"
-            allWarningsAsErrors = true
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+            allWarningsAsErrors.set(true)
         }
     }
 
@@ -62,7 +62,7 @@ subprojects {
         group = LifecycleBasePlugin.VERIFICATION_GROUP
         description = "Check Kotlin code style"
         classpath = ktlint
-        main = "com.pinterest.ktlint.Main"
+        mainClass.set("com.pinterest.ktlint.Main")
         args("src/**/*.kt")
     }
 
@@ -70,7 +70,7 @@ subprojects {
         group = LifecycleBasePlugin.VERIFICATION_GROUP
         description = "Fix Kotlin code style deviations"
         classpath = ktlint
-        main = "com.pinterest.ktlint.Main"
+        mainClass.set("com.pinterest.ktlint.Main")
         args("-F", "src/**/*.kt")
     }
 }

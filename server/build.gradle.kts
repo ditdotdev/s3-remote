@@ -5,9 +5,7 @@
 plugins {
     kotlin("jvm")
     jacoco
-    "com.github.ben-manes.versions"
     `maven-publish`
-
 }
 repositories {
     mavenLocal()
@@ -15,13 +13,13 @@ repositories {
     maven("https://dl.bintray.com/kotlin/kotlinx")
     maven {
         name = "titan"
-        url = uri("https://maven.titan-data.io")
+        url = uri("https://datadatdat-maven.s3.amazonaws.com")
     }
 }
 
 dependencies {
     implementation(kotlin("stdlib"))
-    implementation("io.titandata:remote-sdk:0.2.0")
+    implementation("io.titandata:remote-sdk:0.2.1")
     implementation("com.google.code.gson:gson:2.13.2")
     implementation("com.amazonaws:aws-java-sdk-s3:1.12.791")
     implementation("javax.xml.bind:jaxb-api:2.3.1")

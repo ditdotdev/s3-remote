@@ -55,9 +55,7 @@ class S3RemoteServerTest : StringSpec() {
             type = RemoteOperationType.PUSH,
         )
 
-    override fun beforeTest(testCase: TestCase) {
-        return MockKAnnotations.init(this)
-    }
+    override fun beforeTest(testCase: TestCase) = MockKAnnotations.init(this)
 
     override fun afterTest(
         testCase: TestCase,
@@ -342,8 +340,8 @@ class S3RemoteServerTest : StringSpec() {
                     arrayOf(
                         "{\"id\":\"a\",\"properties\":{\"tags\":{\"c\":\"d\"}}}",
                         "{\"id\":\"b\",\"properties\":{}}",
-                    )
-                        .joinToString("\n").toByteArray(),
+                    ).joinToString("\n")
+                        .toByteArray(),
                 )
             val result = server.listCommits(emptyMap(), emptyMap(), listOf("c" to null))
             result.size shouldBe 1
@@ -370,7 +368,10 @@ class S3RemoteServerTest : StringSpec() {
             )
             slot.captured.bucketName shouldBe "bucket"
             slot.captured.key shouldBe "path/titan"
-            val newContent = slot.captured.inputStream.bufferedReader().use(BufferedReader::readText)
+            val newContent =
+                slot.captured.inputStream
+                    .bufferedReader()
+                    .use(BufferedReader::readText)
             newContent shouldBe "{\"id\":\"a\",\"properties\":{}}\n{\"id\":\"b\",\"properties\":{})\n"
         }
 
@@ -390,7 +391,10 @@ class S3RemoteServerTest : StringSpec() {
             )
             slot.captured.bucketName shouldBe "bucket"
             slot.captured.key shouldBe "path/titan"
-            val newContent = slot.captured.inputStream.bufferedReader().use(BufferedReader::readText)
+            val newContent =
+                slot.captured.inputStream
+                    .bufferedReader()
+                    .use(BufferedReader::readText)
             newContent shouldBe "{\"id\":\"b\",\"properties\":{}}\n"
         }
 
@@ -415,7 +419,8 @@ class S3RemoteServerTest : StringSpec() {
             every { server.getClient(any(), any()) } returns s3
             every { server.listCommits(any(), any(), any()) } returns
                 listOf(
-                    "a" to emptyMap(), "b" to emptyMap(),
+                    "a" to emptyMap(),
+                    "b" to emptyMap(),
                 )
             every { s3.putObject(any<String>(), any<String>(), any<String>()) } returns mockk()
 

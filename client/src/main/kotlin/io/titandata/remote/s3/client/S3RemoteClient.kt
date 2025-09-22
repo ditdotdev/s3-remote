@@ -30,9 +30,7 @@ import java.net.URI
 class S3RemoteClient : RemoteClient {
     private val util = RemoteClientUtil()
 
-    override fun getProvider(): String {
-        return "s3"
-    }
+    override fun getProvider(): String = "s3"
 
     override fun parseUri(
         uri: URI,

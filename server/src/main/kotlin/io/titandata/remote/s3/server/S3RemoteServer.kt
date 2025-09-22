@@ -46,9 +46,7 @@ class S3RemoteServer : ArchiveRemote() {
     internal val gson = GsonBuilder().create()
     internal val util = RemoteServerUtil()
 
-    override fun getProvider(): String {
-        return "s3"
-    }
+    override fun getProvider(): String = "s3"
 
     /**
      * Validate a S3 remote. The only required field is "bucket". Optional fields include (path, accessKey,
@@ -105,7 +103,11 @@ class S3RemoteServer : ArchiveRemote() {
             }
         val provider = AWSStaticCredentialsProvider(creds)
 
-        return AmazonS3ClientBuilder.standard().withCredentials(provider).withRegion(region).build()!!
+        return AmazonS3ClientBuilder
+            .standard()
+            .withCredentials(provider)
+            .withRegion(region)
+            .build()!!
     }
 
     /**
@@ -132,13 +134,12 @@ class S3RemoteServer : ArchiveRemote() {
      * Gets the path to the titan repo metadata file, which is either in the root of the bucket (if the path is
      * null) or within the path directory.
      */
-    internal fun getMetadataKey(key: String?): String {
-        return if (key == null) {
+    internal fun getMetadataKey(key: String?): String =
+        if (key == null) {
             "titan"
         } else {
             "$key/titan"
         }
-    }
 
     /**
      * Helper function that fetches the content of the metadata file as an input stream. Returns an empty file if
@@ -268,18 +269,22 @@ class S3RemoteServer : ArchiveRemote() {
         val (bucket, key) = getPath(remote)
         val originalCommits = listCommits(remote, params, emptyList())
         val metadata =
-            originalCommits.map {
-                if (it.first == commitId) {
-                    gson.toJson(mapOf("id" to it.first, "properties" to commit))
-                } else {
-                    gson.toJson(mapOf("id" to it.first, "properties" to it.second))
-                }
-            }.joinToString("\n") + "\n"
+            originalCommits
+                .map {
+                    if (it.first == commitId) {
+                        gson.toJson(mapOf("id" to it.first, "properties" to commit))
+                    } else {
+                        gson.toJson(mapOf("id" to it.first, "properties" to it.second))
+                    }
+                }.joinToString("\n") + "\n"
 
         s3.putObject(bucket, getMetadataKey(key), metadata)
     }
 
-    class S3Operation(provider: S3RemoteServer, operation: RemoteOperation) {
+    class S3Operation(
+        provider: S3RemoteServer,
+        operation: RemoteOperation,
+    ) {
         val s3: AmazonS3
         val bucket: String
         val key: String?
@@ -292,9 +297,7 @@ class S3RemoteServer : ArchiveRemote() {
         }
     }
 
-    override fun syncDataStart(operation: RemoteOperation): Any? {
-        return S3Operation(this, operation)
-    }
+    override fun syncDataStart(operation: RemoteOperation): Any? = S3Operation(this, operation)
 
     override fun syncDataEnd(
         operation: RemoteOperation,

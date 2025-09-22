@@ -46,7 +46,7 @@ subprojects {
     val ktlint by configurations.creating
 
     dependencies {
-        ktlint("com.pinterest:ktlint:0.51.0-FINAL")
+        ktlint("com.pinterest.ktlint:ktlint-cli:1.7.1")
     }
 
     // Treat all warnings as errors

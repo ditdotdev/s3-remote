@@ -24,7 +24,7 @@ dependencies {
     implementation("com.amazonaws:aws-java-sdk-s3:1.12.792")
     implementation("javax.xml.bind:jaxb-api:2.3.1")
     testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
-    testImplementation("io.mockk:mockk:1.14.5")
+    testImplementation("io.mockk:mockk:1.14.6")
 }
 
 // Jar configuration

@@ -21,7 +21,7 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib"))
     implementation("io.titandata:remote-sdk:0.2.1")
-    implementation("software.amazon.awssdk:auth:2.35.3")
+    implementation("software.amazon.awssdk:auth:2.35.4")
     testImplementation("io.mockk:mockk:1.14.6")
     testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
 }

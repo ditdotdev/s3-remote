@@ -1,8 +1,8 @@
 /*
- * Copyright The Titan Project Contributors.
+ * Copyright Datadatdat.
  */
 
-package io.titandata.remote.s3.server
+package com.datadatdat.remote.s3.server
 
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.auth.BasicSessionCredentials
@@ -31,9 +31,9 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.verify
-import io.titandata.remote.RemoteOperation
-import io.titandata.remote.RemoteOperationType
-import io.titandata.remote.RemoteProgress
+import com.datadatdat.remote.RemoteOperation
+import com.datadatdat.remote.RemoteOperationType
+import com.datadatdat.remote.RemoteProgress
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -250,7 +250,7 @@ class S3RemoteServerTest : StringSpec() {
 
         "get commit fails if metadata is missing properties" {
             val metadata = ObjectMetadata()
-            metadata.userMetadata = mapOf("io.titan-data" to "{}")
+            metadata.userMetadata = mapOf("com.datadatdat" to "{}")
             val s3: AmazonS3Client = mockk()
             every { s3.getObjectMetadata(any(), any()) } returns metadata
             every { server.getClient(any(), any()) } returns s3
@@ -260,7 +260,7 @@ class S3RemoteServerTest : StringSpec() {
 
         "get commit succeeds" {
             val metadata = ObjectMetadata()
-            metadata.userMetadata = mapOf("io.titan-data" to "{\"properties\":{\"a\":\"b\"}}")
+            metadata.userMetadata = mapOf("com.datadatdat" to "{\"properties\":{\"a\":\"b\"}}")
             val s3: AmazonS3Client = mockk()
             every { s3.getObjectMetadata(any(), any()) } returns metadata
             every { server.getClient(any(), any()) } returns s3
@@ -288,13 +288,12 @@ class S3RemoteServerTest : StringSpec() {
             }
         }
 
-        "get metadata key returns titan if path is null" {
-            server.getMetadataKey(null) shouldBe "titan"
+                "get metadata key returns datadatdat if path is null" {
+            server.getMetadataKey(null) shouldBe "datadatdat"
         }
 
-        "get metadata key returns path directory if set" {
-            server.getMetadataKey("path") shouldBe "path/titan"
-        }
+        "get metadata key returns path/datadatdat if path is not null" {
+            server.getMetadataKey("path") shouldBe "path/datadatdat"
 
         "get metadata content succeeds" {
             val obj: S3Object = mockk()
@@ -305,7 +304,7 @@ class S3RemoteServerTest : StringSpec() {
             val result = server.getMetadataContent(mapOf("bucket" to "bucket", "path" to "path"), emptyMap())
             result.bufferedReader().readText() shouldBe "test"
             verify {
-                s3.getObject("bucket", "path/titan")
+                s3.getObject("bucket", "path/datadatdat")
             }
         }
 
@@ -367,7 +366,7 @@ class S3RemoteServerTest : StringSpec() {
                 "{\"id\":\"b\",\"properties\":{})",
             )
             slot.captured.bucketName shouldBe "bucket"
-            slot.captured.key shouldBe "path/titan"
+            slot.captured.key shouldBe "path/datadatdat"
             val newContent =
                 slot.captured.inputStream
                     .bufferedReader()
@@ -390,7 +389,7 @@ class S3RemoteServerTest : StringSpec() {
                 "{\"id\":\"b\",\"properties\":{}}",
             )
             slot.captured.bucketName shouldBe "bucket"
-            slot.captured.key shouldBe "path/titan"
+            slot.captured.key shouldBe "path/datadatdat"
             val newContent =
                 slot.captured.inputStream
                     .bufferedReader()
@@ -434,7 +433,7 @@ class S3RemoteServerTest : StringSpec() {
             verify {
                 s3.putObject(
                     "bucket",
-                    "path/titan",
+                    "path/datadatdat",
                     "{\"id\":\"a\",\"properties\":{\"x\":\"y\"}}\n{\"id\":\"b\",\"properties\":{}}\n",
                 )
             }
@@ -503,7 +502,7 @@ class S3RemoteServerTest : StringSpec() {
 
             slot.captured.bucketName shouldBe "bucket"
             slot.captured.key shouldBe "path/commit"
-            slot.captured.metadata.userMetadata["io.titan-data"] shouldBe "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}"
+            slot.captured.metadata.userMetadata["com.datadatdat"] shouldBe "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}"
 
             verify {
                 server.updateMetadata(any(), any(), "commit", mapOf("a" to "b"))
@@ -521,7 +520,7 @@ class S3RemoteServerTest : StringSpec() {
 
             slot.captured.bucketName shouldBe "bucket"
             slot.captured.key shouldBe "path/commit"
-            slot.captured.metadata.userMetadata["io.titan-data"] shouldBe "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}"
+            slot.captured.metadata.userMetadata["com.datadatdat"] shouldBe "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}"
 
             verify {
                 server.appendMetadata(any(), any(), "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}")

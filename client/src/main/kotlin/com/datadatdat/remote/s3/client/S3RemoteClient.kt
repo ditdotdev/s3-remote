@@ -1,11 +1,11 @@
 /*
- * Copyright The Titan Project Contributors.
+ * Copyright Datadatdat.
  */
 
-package io.titandata.remote.s3.client
+package com.datadatdat.remote.s3.client
 
-import io.titandata.remote.RemoteClient
-import io.titandata.remote.RemoteClientUtil
+import com.datadatdat.remote.RemoteClient
+import com.datadatdat.remote.RemoteClientUtil
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain

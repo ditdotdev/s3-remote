@@ -12,11 +12,11 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.s3.model.PutObjectRequest
-import com.google.gson.GsonBuilder
-import com.google.gson.reflect.TypeToken
 import com.datadatdat.remote.RemoteOperation
 import com.datadatdat.remote.RemoteServerUtil
 import com.datadatdat.remote.archive.ArchiveRemote
+import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream

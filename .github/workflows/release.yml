@@ -1,9 +1,9 @@
 #
-# Copyright The Titan Project Contributors.
+# Copyright Datadatdat.
 #
 
 #
-# On creating a new tag, we publish our maven artifacts to the titan maven bucket.
+# On creating a new tag, we publish our maven artifacts to the datadatdat maven bucket.
 #
 name: Release
 

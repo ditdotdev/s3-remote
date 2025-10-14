@@ -1,8 +1,8 @@
 /*
- * Copyright The Titan Project Contributors.
+ * Copyright Datadatdat.
  */
 
-package io.titandata.remote.s3.server
+package com.datadatdat.remote.s3.server
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider
 import com.amazonaws.auth.BasicAWSCredentials
@@ -14,9 +14,9 @@ import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.s3.model.PutObjectRequest
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
-import io.titandata.remote.RemoteOperation
-import io.titandata.remote.RemoteServerUtil
-import io.titandata.remote.archive.ArchiveRemote
+import com.datadatdat.remote.RemoteOperation
+import com.datadatdat.remote.RemoteServerUtil
+import com.datadatdat.remote.archive.ArchiveRemote
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
@@ -29,7 +29,7 @@ import java.io.SequenceInputStream
  *      s3://bucket/path/to/repo/3583-4053-598ea-298fa
  *
  * Within each commit sub-directory, there is .tar.gz file for each volume. The metadata for each commit is stored
- * as metadata for the object, as well in a 'titan' file at the root of the repository, with once line per commit. We
+ * as metadata for the object, as well in a 'datadatdat' file at the root of the repository, with once line per commit. We
  * do this for a few reasons:
  *
  *      * Storing it in object metdata is inefficient, as there's no way to fetch the metadata of multiple objects
@@ -42,7 +42,7 @@ import java.io.SequenceInputStream
  * Properly solving them would require a more sophisticated provider with server-side logic.
  */
 class S3RemoteServer : ArchiveRemote() {
-    private val metadataProp = "io.titan-data"
+    private val metadataProp = "com.datadatdat"
     internal val gson = GsonBuilder().create()
     internal val util = RemoteServerUtil()
 
@@ -131,14 +131,14 @@ class S3RemoteServer : ArchiveRemote() {
     }
 
     /**
-     * Gets the path to the titan repo metadata file, which is either in the root of the bucket (if the path is
+     * Gets the path to the datadatdat repo metadata file, which is either in the root of the bucket (if the path is
      * null) or within the path directory.
      */
     internal fun getMetadataKey(key: String?): String =
         if (key == null) {
-            "titan"
+            "datadatdat"
         } else {
-            "$key/titan"
+            "$key/datadatdat"
         }
 
     /**
@@ -165,7 +165,7 @@ class S3RemoteServer : ArchiveRemote() {
 
     /**
      * Get the metadata for a single commit. This is stored as a user property on the object with the key
-     * "io.titan-data". For historical reasons, we keep the metadata within the "properties" sub-object. This
+     * "com.datadatdat". For historical reasons, we keep the metadata within the "properties" sub-object. This
      * matches how it's stored in the top-level metadata file.
      */
     override fun getCommit(

@@ -1,8 +1,8 @@
 /*
- * Copyright The Titan Project Contributors.
+ * Copyright Datadatdat.
  */
 
-package io.titandata.remote.s3.client
+package com.datadatdat.remote.s3.client
 
 import io.kotlintest.TestCase
 import io.kotlintest.TestCaseOrder

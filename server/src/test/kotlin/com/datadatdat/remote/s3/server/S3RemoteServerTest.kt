@@ -14,6 +14,9 @@ import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.s3.model.PutObjectRequest
 import com.amazonaws.services.s3.model.S3Object
 import com.amazonaws.services.s3.model.S3ObjectInputStream
+import com.datadatdat.remote.RemoteOperation
+import com.datadatdat.remote.RemoteOperationType
+import com.datadatdat.remote.RemoteProgress
 import io.kotlintest.TestCase
 import io.kotlintest.TestCaseOrder
 import io.kotlintest.TestResult
@@ -31,9 +34,6 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.verify
-import com.datadatdat.remote.RemoteOperation
-import com.datadatdat.remote.RemoteOperationType
-import com.datadatdat.remote.RemoteProgress
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -288,12 +288,13 @@ class S3RemoteServerTest : StringSpec() {
             }
         }
 
-                "get metadata key returns datadatdat if path is null" {
+        "get metadata key returns datadatdat if path is null" {
             server.getMetadataKey(null) shouldBe "datadatdat"
         }
 
         "get metadata key returns path/datadatdat if path is not null" {
             server.getMetadataKey("path") shouldBe "path/datadatdat"
+        }
 
         "get metadata content succeeds" {
             val obj: S3Object = mockk()

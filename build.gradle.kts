@@ -73,4 +73,9 @@ subprojects {
         mainClass.set("com.pinterest.ktlint.Main")
         args("-F", "src/**/*.kt")
     }
+
+    // Run ktlint as part of the check task (if it exists)
+    afterEvaluate {
+        tasks.findByName("check")?.dependsOn(ktlintTask)
+    }
 }

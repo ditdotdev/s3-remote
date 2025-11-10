@@ -20,7 +20,7 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    implementation("com.datadatdat:remote-sdk:1.0.0")
+    implementation("com.datadatdat:remote-sdk:1.3.0")
     implementation("software.amazon.awssdk:auth:2.38.1")
     testImplementation("io.mockk:mockk:1.14.6")
     testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")

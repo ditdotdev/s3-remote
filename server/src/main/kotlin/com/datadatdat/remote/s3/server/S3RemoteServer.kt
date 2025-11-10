@@ -67,9 +67,10 @@ class S3RemoteServer : ArchiveRemote() {
     /**
      * Validate S3 parameters. All parameters are optional: (accessKey, secretKey, region, sessionToken).
      */
-    override fun validateParameters(parameters: Map<String, Any>): Map<String, Any> {
-        util.validateFields(parameters, emptyList(), listOf("accessKey", "secretKey", "region", "sessionToken"))
-        return parameters
+    override fun validateParameters(parameters: Map<String, Any>?): Map<String, Any> {
+        val params = parameters ?: emptyMap()
+        util.validateFields(params, emptyList(), listOf("accessKey", "secretKey", "region", "sessionToken"))
+        return params
     }
 
     /**

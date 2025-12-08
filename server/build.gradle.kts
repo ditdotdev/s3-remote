@@ -23,7 +23,7 @@ dependencies {
 	implementation("com.amazonaws:aws-java-sdk-s3:1.12.794")
 	implementation("javax.xml.bind:jaxb-api:2.3.1")
 	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
-	testImplementation("io.mockk:mockk:1.14.6")
+	testImplementation("io.mockk:mockk:1.14.7")
 }// Jar configuration
 group = "com.datadatdat"
 version = when(project.hasProperty("version")) {

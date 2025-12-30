@@ -20,7 +20,7 @@ dependencies {
 	implementation(kotlin("stdlib"))
 	implementation("com.datadatdat:remote-sdk:1.5.0")
 	implementation("com.google.code.gson:gson:2.13.2")
-	implementation("com.amazonaws:aws-java-sdk-s3:1.12.794")
+	implementation("com.amazonaws:aws-java-sdk-s3:1.12.797")
 	implementation("javax.xml.bind:jaxb-api:2.3.1")
 	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
 	testImplementation("io.mockk:mockk:1.14.7")

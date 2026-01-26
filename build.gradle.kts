@@ -15,7 +15,7 @@ buildscript {
 
     dependencies {
         classpath("com.github.ben-manes:gradle-versions-plugin:0.53.0")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.0")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
     }
 }
 
@@ -23,12 +23,12 @@ buildscript {
 tasks.withType<DependencyUpdatesTask>().configureEach {
     resolutionStrategy {
         componentSelection {
-            all {
+            all { selection: ComponentSelection ->
                 val rejected = listOf("alpha", "beta", "rc", "cr", "m", "preview", "b", "ea", "eap").any { qualifier ->
-                    candidate.version.matches(Regex("(?i).*[.-]$qualifier[.\\d-+]*"))
+                    selection.candidate.version.matches(Regex("(?i).*[.-]$qualifier[.\\d-+]*"))
                 }
                 if (rejected) {
-                    reject("Release candidate")
+                    selection.reject("Release candidate")
                 }
             }
         }

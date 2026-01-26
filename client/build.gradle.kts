@@ -22,7 +22,7 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation("com.datadatdat:remote-sdk:1.5.0")
     implementation("software.amazon.awssdk:auth:2.41.8")
-    testImplementation("io.mockk:mockk:1.14.7")
+    testImplementation("io.mockk:mockk:1.13.14")
     testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
 }
 
@@ -76,5 +76,14 @@ tasks.named("check").get().dependsOn(tasks.named("ktlint"))
 
 tasks.test {
     useJUnitPlatform()
+    jvmArgs(
+        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/java.io=ALL-UNNAMED",
+        "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio.file=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-opens", "java.base/java.net=ALL-UNNAMED"
+    )
 }
 

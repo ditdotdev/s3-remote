@@ -23,7 +23,7 @@ dependencies {
 	implementation("com.amazonaws:aws-java-sdk-s3:1.12.797")
 	implementation("javax.xml.bind:jaxb-api:2.3.1")
 	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
-	testImplementation("io.mockk:mockk:1.14.7")
+	testImplementation("io.mockk:mockk:1.13.14")
 }// Jar configuration
 group = "com.datadatdat"
 version = when(project.hasProperty("version")) {
@@ -71,5 +71,14 @@ publishing {
 
 tasks.test {
     useJUnitPlatform()
+    jvmArgs(
+        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/java.io=ALL-UNNAMED",
+        "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio.file=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-opens", "java.base/java.net=ALL-UNNAMED"
+    )
 }
 

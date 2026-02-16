@@ -4,19 +4,22 @@
 
 package com.datadatdat.remote.s3.server
 
-import com.amazonaws.auth.AWSStaticCredentialsProvider
-import com.amazonaws.auth.BasicAWSCredentials
-import com.amazonaws.auth.BasicSessionCredentials
-import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.AmazonS3ClientBuilder
-import com.amazonaws.services.s3.model.AmazonS3Exception
-import com.amazonaws.services.s3.model.ObjectMetadata
-import com.amazonaws.services.s3.model.PutObjectRequest
 import com.datadatdat.remote.RemoteOperation
 import com.datadatdat.remote.RemoteServerUtil
 import com.datadatdat.remote.archive.ArchiveRemote
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
+import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.core.sync.RequestBody
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.GetObjectRequest
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
+import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.services.s3.model.S3Exception
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
@@ -79,7 +82,7 @@ class S3RemoteServer : ArchiveRemote() {
     fun getClient(
         remote: Map<String, Any>,
         parameters: Map<String, Any>,
-    ): AmazonS3 {
+    ): S3Client {
         val accessKey =
             (
                 parameters.get("accessKey") ?: remote["accessKey"]
@@ -98,17 +101,17 @@ class S3RemoteServer : ArchiveRemote() {
 
         val creds =
             if (parameters.containsKey("sessionToken")) {
-                BasicSessionCredentials(accessKey, secretKey, parameters.get("sessionToken").toString())
+                AwsSessionCredentials.create(accessKey, secretKey, parameters.get("sessionToken").toString())
             } else {
-                BasicAWSCredentials(accessKey, secretKey)
+                AwsBasicCredentials.create(accessKey, secretKey)
             }
-        val provider = AWSStaticCredentialsProvider(creds)
+        val provider = StaticCredentialsProvider.create(creds)
 
-        return AmazonS3ClientBuilder
-            .standard()
-            .withCredentials(provider)
-            .withRegion(region)
-            .build()!!
+        return S3Client
+            .builder()
+            .credentialsProvider(provider)
+            .region(Region.of(region))
+            .build()
     }
 
     /**
@@ -154,9 +157,17 @@ class S3RemoteServer : ArchiveRemote() {
         val (bucket, key) = getPath(remote)
 
         try {
-            return s3.getObject(bucket, getMetadataKey(key)).objectContent
-        } catch (e: AmazonS3Exception) {
-            if (e.statusCode == 404) {
+            val request =
+                GetObjectRequest
+                    .builder()
+                    .bucket(bucket)
+                    .key(getMetadataKey(key))
+                    .build()
+            return s3.getObject(request)
+        } catch (e: NoSuchKeyException) {
+            return ByteArrayInputStream("".toByteArray())
+        } catch (e: S3Exception) {
+            if (e.statusCode() == 404) {
                 return ByteArrayInputStream("".toByteArray())
             } else {
                 throw e
@@ -177,19 +188,28 @@ class S3RemoteServer : ArchiveRemote() {
         val s3 = getClient(remote, parameters)
         val (bucket, key) = getPath(remote, commitId)
         try {
-            val obj = s3.getObjectMetadata(bucket, key)
-            if (obj.userMetadata == null || !obj.userMetadata.containsKey(metadataProp)) {
+            val request =
+                HeadObjectRequest
+                    .builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .build()
+            val response = s3.headObject(request)
+            val userMetadata = response.metadata()
+            if (userMetadata == null || !userMetadata.containsKey(metadataProp)) {
                 return null
             }
-            val metadata: Map<String, Any> = gson.fromJson(obj.userMetadata[metadataProp], object : TypeToken<Map<String, Any>>() {}.type)
+            val metadata: Map<String, Any> = gson.fromJson(userMetadata[metadataProp], object : TypeToken<Map<String, Any>>() {}.type)
 
             if (!metadata.containsKey("properties")) {
                 return null
             }
             @Suppress("UNCHECKED_CAST")
             return metadata["properties"] as Map<String, Any>
-        } catch (e: AmazonS3Exception) {
-            if (e.statusCode == 404) {
+        } catch (e: NoSuchKeyException) {
+            return null
+        } catch (e: S3Exception) {
+            if (e.statusCode() == 404) {
                 return null
             }
             throw e
@@ -241,11 +261,19 @@ class S3RemoteServer : ArchiveRemote() {
         var length = 0L
         var currentMetadata: InputStream
         try {
-            val obj = s3.getObject(bucket, getMetadataKey(key))
-            currentMetadata = obj.objectContent
-            length = obj.objectMetadata.contentLength
-        } catch (e: AmazonS3Exception) {
-            if (e.statusCode == 404) {
+            val request =
+                GetObjectRequest
+                    .builder()
+                    .bucket(bucket)
+                    .key(getMetadataKey(key))
+                    .build()
+            val responseStream = s3.getObject(request)
+            length = responseStream.response().contentLength()
+            currentMetadata = responseStream
+        } catch (e: NoSuchKeyException) {
+            currentMetadata = ByteArrayInputStream("".toByteArray())
+        } catch (e: S3Exception) {
+            if (e.statusCode() == 404) {
                 currentMetadata = ByteArrayInputStream("".toByteArray())
             } else {
                 throw e
@@ -254,9 +282,15 @@ class S3RemoteServer : ArchiveRemote() {
 
         val appendStream = ByteArrayInputStream("$json\n".toByteArray())
         val stream = SequenceInputStream(currentMetadata, appendStream)
-        var objectMetadata = ObjectMetadata()
-        objectMetadata.contentLength = length + json.length + 1
-        s3.putObject(PutObjectRequest(bucket, getMetadataKey(key), stream, objectMetadata))
+        val totalLength = length + json.length + 1
+        val request =
+            PutObjectRequest
+                .builder()
+                .bucket(bucket)
+                .key(getMetadataKey(key))
+                .contentLength(totalLength)
+                .build()
+        s3.putObject(request, RequestBody.fromInputStream(stream, totalLength))
     }
 
     // There is no efficient way to do this, simply read all the commits, update the one in question, and upload
@@ -279,14 +313,20 @@ class S3RemoteServer : ArchiveRemote() {
                     }
                 }.joinToString("\n") + "\n"
 
-        s3.putObject(bucket, getMetadataKey(key), metadata)
+        val request =
+            PutObjectRequest
+                .builder()
+                .bucket(bucket)
+                .key(getMetadataKey(key))
+                .build()
+        s3.putObject(request, RequestBody.fromString(metadata))
     }
 
     class S3Operation(
         provider: S3RemoteServer,
         operation: RemoteOperation,
     ) {
-        val s3: AmazonS3
+        val s3: S3Client
         val bucket: String
         val key: String?
 
@@ -315,8 +355,14 @@ class S3RemoteServer : ArchiveRemote() {
         archive: File,
     ) {
         val data = operationData as S3Operation
-        val obj = data.s3.getObject(data.bucket, "${data.key}/$volume.tar.gz")
-        obj.objectContent.use { input ->
+        val request =
+            GetObjectRequest
+                .builder()
+                .bucket(data.bucket)
+                .key("${data.key}/$volume.tar.gz")
+                .build()
+        val obj = data.s3.getObject(request)
+        obj.use { input ->
             archive.outputStream().use { output ->
                 input.copyTo(output)
             }
@@ -330,7 +376,13 @@ class S3RemoteServer : ArchiveRemote() {
         archive: File,
     ) {
         val data = operationData as S3Operation
-        data.s3.putObject(data.bucket, "${data.key}/$volume.tar.gz", archive)
+        val request =
+            PutObjectRequest
+                .builder()
+                .bucket(data.bucket)
+                .key("${data.key}/$volume.tar.gz")
+                .build()
+        data.s3.putObject(request, RequestBody.fromFile(archive))
     }
 
     override fun pushMetadata(
@@ -339,13 +391,17 @@ class S3RemoteServer : ArchiveRemote() {
         isUpdate: Boolean,
     ) {
         val data = S3Operation(this, operation)
-        val metadata = ObjectMetadata()
         val json = gson.toJson(mapOf("id" to operation.commitId, "properties" to commit))
-        metadata.userMetadata = mapOf(metadataProp to json)
-        metadata.contentLength = 0
-        val input = ByteArrayInputStream("".toByteArray())
-        val request = PutObjectRequest(data.bucket, data.key, input, metadata)
-        data.s3.putObject(request)
+        val userMetadata = mapOf(metadataProp to json)
+        val request =
+            PutObjectRequest
+                .builder()
+                .bucket(data.bucket)
+                .key(data.key)
+                .metadata(userMetadata)
+                .contentLength(0)
+                .build()
+        data.s3.putObject(request, RequestBody.fromBytes(ByteArray(0)))
 
         if (isUpdate) {
             updateMetadata(operation.remote, operation.parameters, operation.commitId, commit)

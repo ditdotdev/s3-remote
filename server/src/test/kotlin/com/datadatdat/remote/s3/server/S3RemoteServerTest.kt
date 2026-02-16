@@ -525,5 +525,78 @@ class S3RemoteServerTest : StringSpec() {
                 server.appendMetadata(any(), any(), "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}")
             }
         }
+
+        // Coverage tests for uncovered branches
+
+        "gson property is accessible" {
+            server.gson shouldNotBe null
+        }
+
+        "util property is accessible" {
+            server.util shouldNotBe null
+        }
+
+        "validate parameters with null input returns empty map" {
+            val result = server.validateParameters(null)
+            result shouldBe emptyMap()
+        }
+
+        "get client with credentials from parameters" {
+            val client =
+                server.getClient(
+                    mapOf("bucket" to "bucket"),
+                    mapOf("accessKey" to "key", "secretKey" to "secret", "region" to "us-east-1"),
+                )
+            client shouldNotBe null
+        }
+
+        "get commit with null metadata returns null" {
+            val response: HeadObjectResponse = mockk()
+            every { response.metadata() } returns null
+            val s3: S3Client = mockk()
+            every { s3.headObject(any<HeadObjectRequest>()) } returns response
+            every { server.getClient(any(), any()) } returns s3
+
+            val result = server.getCommit(mapOf("bucket" to "bucket"), emptyMap(), "commit")
+            result shouldBe null
+        }
+
+        "get commit with metadata missing properties key" {
+            val response: HeadObjectResponse = mockk()
+            every { response.metadata() } returns mapOf("com.datadatdat" to "{\"someOtherKey\":\"value\"}")
+            val s3: S3Client = mockk()
+            every { s3.headObject(any<HeadObjectRequest>()) } returns response
+            every { server.getClient(any(), any()) } returns s3
+
+            val result = server.getCommit(mapOf("bucket" to "bucket"), emptyMap(), "commit")
+            result shouldBe null
+        }
+
+        "list commits handles malformed JSON with missing id" {
+            val content = "{\"properties\":{}}\n"
+            val metadata = ByteArrayInputStream(content.toByteArray())
+            every { server.getMetadataContent(any(), any()) } returns metadata
+
+            val result = server.listCommits(emptyMap(), emptyMap(), emptyList())
+            result.size shouldBe 0
+        }
+
+        "list commits handles malformed JSON with missing properties" {
+            val content = "{\"id\":\"commit-id\"}\n"
+            val metadata = ByteArrayInputStream(content.toByteArray())
+            every { server.getMetadataContent(any(), any()) } returns metadata
+
+            val result = server.listCommits(emptyMap(), emptyMap(), emptyList())
+            result.size shouldBe 0
+        }
+
+        "list commits handles empty lines in metadata" {
+            val content = "\n{\"id\":\"a\",\"properties\":{}}\n\n"
+            val metadata = ByteArrayInputStream(content.toByteArray())
+            every { server.getMetadataContent(any(), any()) } returns metadata
+
+            val result = server.listCommits(emptyMap(), emptyMap(), emptyList())
+            result.size shouldBe 1
+        }
     }
 }

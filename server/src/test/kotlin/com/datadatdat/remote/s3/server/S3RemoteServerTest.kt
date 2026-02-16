@@ -186,15 +186,20 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "get client uses basic credentials" {
-            val client = server.getClient(mapOf("accessKey" to "accessKey", "secretKey" to "secretKey", "region" to "us-east-1"), emptyMap())
+            val client =
+                server.getClient(
+                    mapOf("accessKey" to "accessKey", "secretKey" to "secretKey", "region" to "us-east-1"),
+                    emptyMap(),
+                )
             client shouldNotBe null
         }
 
         "get client uses session token" {
-            val client = server.getClient(
-                mapOf("accessKey" to "accessKey", "secretKey" to "secretKey", "region" to "us-east-1"),
-                mapOf("sessionToken" to "token"),
-            )
+            val client =
+                server.getClient(
+                    mapOf("accessKey" to "accessKey", "secretKey" to "secretKey", "region" to "us-east-1"),
+                    mapOf("sessionToken" to "token"),
+                )
             client shouldNotBe null
         }
 
@@ -346,7 +351,9 @@ class S3RemoteServerTest : StringSpec() {
                 "{\"id\":\"b\",\"properties\":{})",
             )
             val newContent =
-                slot.captured.contentStreamProvider().newStream()
+                slot.captured
+                    .contentStreamProvider()
+                    .newStream()
                     .bufferedReader()
                     .use(BufferedReader::readText)
             newContent shouldBe "{\"id\":\"a\",\"properties\":{}}\n{\"id\":\"b\",\"properties\":{})\n"
@@ -365,7 +372,9 @@ class S3RemoteServerTest : StringSpec() {
                 "{\"id\":\"b\",\"properties\":{}}",
             )
             val newContent =
-                slot.captured.contentStreamProvider().newStream()
+                slot.captured
+                    .contentStreamProvider()
+                    .newStream()
                     .bufferedReader()
                     .use(BufferedReader::readText)
             newContent shouldBe "{\"id\":\"b\",\"properties\":{}}\n"
@@ -384,7 +393,9 @@ class S3RemoteServerTest : StringSpec() {
                 "{\"id\":\"b\",\"properties\":{}}",
             )
             val newContent =
-                slot.captured.contentStreamProvider().newStream()
+                slot.captured
+                    .contentStreamProvider()
+                    .newStream()
                     .bufferedReader()
                     .use(BufferedReader::readText)
             newContent shouldBe "{\"id\":\"b\",\"properties\":{}}\n"
@@ -422,9 +433,12 @@ class S3RemoteServerTest : StringSpec() {
                 mapOf("x" to "y"),
             )
 
-            val content = slot.captured.contentStreamProvider().newStream()
-                .bufferedReader()
-                .use(BufferedReader::readText)
+            val content =
+                slot.captured
+                    .contentStreamProvider()
+                    .newStream()
+                    .bufferedReader()
+                    .use(BufferedReader::readText)
             content shouldBe "{\"id\":\"a\",\"properties\":{\"x\":\"y\"}}\n{\"id\":\"b\",\"properties\":{}}\n"
         }
 

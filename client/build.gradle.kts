@@ -15,6 +15,9 @@ repositories {
     maven {
         name = "datadatdat"
         url = uri("https://datadatdat-maven.s3.amazonaws.com")
+        content {
+            includeGroup("com.datadatdat")
+        }
     }
 }
 

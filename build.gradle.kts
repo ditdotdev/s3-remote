@@ -52,7 +52,7 @@ subprojects {
     // Treat all warnings as errors
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
             allWarningsAsErrors.set(true)
         }
     }

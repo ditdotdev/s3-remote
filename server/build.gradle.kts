@@ -18,7 +18,7 @@ repositories {
 
 dependencies {
 	implementation(kotlin("stdlib"))
-	implementation("com.datadatdat:remote-sdk:1.8.2")
+	implementation("com.datadatdat:remote-sdk:1.8.3")
 	implementation("com.google.code.gson:gson:2.13.2")
 	implementation("software.amazon.awssdk:s3:2.42.31")
 	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")

@@ -21,6 +21,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
 import java.io.ByteArrayInputStream
+import java.io.Closeable
 import java.io.File
 import java.io.InputStream
 import java.io.SequenceInputStream
@@ -154,16 +155,16 @@ class S3RemoteServer : ArchiveRemote() {
         parameters: Map<String, Any>,
     ): InputStream {
         val s3 = getClient(remote, parameters)
-        val (bucket, key) = getPath(remote)
-
         try {
+            val (bucket, key) = getPath(remote)
             val request =
                 GetObjectRequest
                     .builder()
                     .bucket(bucket)
                     .key(getMetadataKey(key))
                     .build()
-            return s3.getObject(request)
+            val bytes = s3.getObject(request).use { it.readAllBytes() }
+            return ByteArrayInputStream(bytes)
         } catch (e: NoSuchKeyException) {
             return ByteArrayInputStream("".toByteArray())
         } catch (e: S3Exception) {
@@ -172,6 +173,8 @@ class S3RemoteServer : ArchiveRemote() {
             } else {
                 throw e
             }
+        } finally {
+            s3.close()
         }
     }
 
@@ -185,34 +188,35 @@ class S3RemoteServer : ArchiveRemote() {
         parameters: Map<String, Any>,
         commitId: String,
     ): Map<String, Any>? {
-        val s3 = getClient(remote, parameters)
-        val (bucket, key) = getPath(remote, commitId)
-        try {
-            val request =
-                HeadObjectRequest
-                    .builder()
-                    .bucket(bucket)
-                    .key(key)
-                    .build()
-            val response = s3.headObject(request)
-            val userMetadata = response.metadata()
-            if (userMetadata == null || !userMetadata.containsKey(metadataProp)) {
-                return null
-            }
-            val metadata: Map<String, Any> = gson.fromJson(userMetadata[metadataProp], object : TypeToken<Map<String, Any>>() {}.type)
+        getClient(remote, parameters).use { s3 ->
+            val (bucket, key) = getPath(remote, commitId)
+            try {
+                val request =
+                    HeadObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .build()
+                val response = s3.headObject(request)
+                val userMetadata = response.metadata()
+                if (userMetadata == null || !userMetadata.containsKey(metadataProp)) {
+                    return null
+                }
+                val metadata: Map<String, Any> = gson.fromJson(userMetadata[metadataProp], object : TypeToken<Map<String, Any>>() {}.type)
 
-            if (!metadata.containsKey("properties")) {
+                if (!metadata.containsKey("properties")) {
+                    return null
+                }
+                @Suppress("UNCHECKED_CAST")
+                return metadata["properties"] as Map<String, Any>
+            } catch (e: NoSuchKeyException) {
                 return null
+            } catch (e: S3Exception) {
+                if (e.statusCode() == 404) {
+                    return null
+                }
+                throw e
             }
-            @Suppress("UNCHECKED_CAST")
-            return metadata["properties"] as Map<String, Any>
-        } catch (e: NoSuchKeyException) {
-            return null
-        } catch (e: S3Exception) {
-            if (e.statusCode() == 404) {
-                return null
-            }
-            throw e
         }
     }
 
@@ -256,41 +260,42 @@ class S3RemoteServer : ArchiveRemote() {
         params: Map<String, Any>,
         json: String,
     ) {
-        val s3 = getClient(remote, params)
-        val (bucket, key) = getPath(remote)
-        var length = 0L
-        var currentMetadata: InputStream
-        try {
+        getClient(remote, params).use { s3 ->
+            val (bucket, key) = getPath(remote)
+            var length = 0L
+            var currentMetadata: InputStream
+            try {
+                val request =
+                    GetObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(getMetadataKey(key))
+                        .build()
+                val responseStream = s3.getObject(request)
+                length = responseStream.response().contentLength()
+                currentMetadata = responseStream
+            } catch (e: NoSuchKeyException) {
+                currentMetadata = ByteArrayInputStream("".toByteArray())
+            } catch (e: S3Exception) {
+                if (e.statusCode() == 404) {
+                    currentMetadata = ByteArrayInputStream("".toByteArray())
+                } else {
+                    throw e
+                }
+            }
+
+            val appendStream = ByteArrayInputStream("$json\n".toByteArray())
+            val stream = SequenceInputStream(currentMetadata, appendStream)
+            val totalLength = length + json.length + 1
             val request =
-                GetObjectRequest
+                PutObjectRequest
                     .builder()
                     .bucket(bucket)
                     .key(getMetadataKey(key))
+                    .contentLength(totalLength)
                     .build()
-            val responseStream = s3.getObject(request)
-            length = responseStream.response().contentLength()
-            currentMetadata = responseStream
-        } catch (e: NoSuchKeyException) {
-            currentMetadata = ByteArrayInputStream("".toByteArray())
-        } catch (e: S3Exception) {
-            if (e.statusCode() == 404) {
-                currentMetadata = ByteArrayInputStream("".toByteArray())
-            } else {
-                throw e
-            }
+            s3.putObject(request, RequestBody.fromInputStream(stream, totalLength))
         }
-
-        val appendStream = ByteArrayInputStream("$json\n".toByteArray())
-        val stream = SequenceInputStream(currentMetadata, appendStream)
-        val totalLength = length + json.length + 1
-        val request =
-            PutObjectRequest
-                .builder()
-                .bucket(bucket)
-                .key(getMetadataKey(key))
-                .contentLength(totalLength)
-                .build()
-        s3.putObject(request, RequestBody.fromInputStream(stream, totalLength))
     }
 
     // There is no efficient way to do this, simply read all the commits, update the one in question, and upload
@@ -300,32 +305,33 @@ class S3RemoteServer : ArchiveRemote() {
         commitId: String,
         commit: Map<String, Any>,
     ) {
-        val s3 = getClient(remote, params)
-        val (bucket, key) = getPath(remote)
-        val originalCommits = listCommits(remote, params, emptyList())
-        val metadata =
-            originalCommits
-                .map {
-                    if (it.first == commitId) {
-                        gson.toJson(mapOf("id" to it.first, "properties" to commit))
-                    } else {
-                        gson.toJson(mapOf("id" to it.first, "properties" to it.second))
-                    }
-                }.joinToString("\n") + "\n"
+        getClient(remote, params).use { s3 ->
+            val (bucket, key) = getPath(remote)
+            val originalCommits = listCommits(remote, params, emptyList())
+            val metadata =
+                originalCommits
+                    .map {
+                        if (it.first == commitId) {
+                            gson.toJson(mapOf("id" to it.first, "properties" to commit))
+                        } else {
+                            gson.toJson(mapOf("id" to it.first, "properties" to it.second))
+                        }
+                    }.joinToString("\n") + "\n"
 
-        val request =
-            PutObjectRequest
-                .builder()
-                .bucket(bucket)
-                .key(getMetadataKey(key))
-                .build()
-        s3.putObject(request, RequestBody.fromString(metadata))
+            val request =
+                PutObjectRequest
+                    .builder()
+                    .bucket(bucket)
+                    .key(getMetadataKey(key))
+                    .build()
+            s3.putObject(request, RequestBody.fromString(metadata))
+        }
     }
 
     class S3Operation(
         provider: S3RemoteServer,
         operation: RemoteOperation,
-    ) {
+    ) : Closeable {
         val s3: S3Client
         val bucket: String
         val key: String?
@@ -336,6 +342,10 @@ class S3RemoteServer : ArchiveRemote() {
             bucket = path.first
             key = path.second
         }
+
+        override fun close() {
+            s3.close()
+        }
     }
 
     override fun syncDataStart(operation: RemoteOperation): Any? = S3Operation(this, operation)
@@ -345,7 +355,7 @@ class S3RemoteServer : ArchiveRemote() {
         operationData: Any?,
         isSuccessful: Boolean,
     ) {
-        // Nothing to do
+        (operationData as? S3Operation)?.close()
     }
 
     override fun pullArchive(
@@ -390,23 +400,24 @@ class S3RemoteServer : ArchiveRemote() {
         commit: Map<String, Any>,
         isUpdate: Boolean,
     ) {
-        val data = S3Operation(this, operation)
-        val json = gson.toJson(mapOf("id" to operation.commitId, "properties" to commit))
-        val userMetadata = mapOf(metadataProp to json)
-        val request =
-            PutObjectRequest
-                .builder()
-                .bucket(data.bucket)
-                .key(data.key)
-                .metadata(userMetadata)
-                .contentLength(0)
-                .build()
-        data.s3.putObject(request, RequestBody.fromBytes(ByteArray(0)))
+        S3Operation(this, operation).use { data ->
+            val json = gson.toJson(mapOf("id" to operation.commitId, "properties" to commit))
+            val userMetadata = mapOf(metadataProp to json)
+            val request =
+                PutObjectRequest
+                    .builder()
+                    .bucket(data.bucket)
+                    .key(data.key)
+                    .metadata(userMetadata)
+                    .contentLength(0)
+                    .build()
+            data.s3.putObject(request, RequestBody.fromBytes(ByteArray(0)))
 
-        if (isUpdate) {
-            updateMetadata(operation.remote, operation.parameters, operation.commitId, commit)
-        } else {
-            appendMetadata(operation.remote, operation.parameters, json)
+            if (isUpdate) {
+                updateMetadata(operation.remote, operation.parameters, operation.commitId, commit)
+            } else {
+                appendMetadata(operation.remote, operation.parameters, json)
+            }
         }
     }
 }

@@ -206,7 +206,7 @@ class S3RemoteServerTest : StringSpec() {
         "get commit fails if no user metadata present" {
             val response: HeadObjectResponse = mockk()
             every { response.metadata() } returns emptyMap()
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3
             val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
@@ -216,7 +216,7 @@ class S3RemoteServerTest : StringSpec() {
         "get commit fails if metadata property is missing" {
             val response: HeadObjectResponse = mockk()
             every { response.metadata() } returns emptyMap()
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3
             val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
@@ -226,7 +226,7 @@ class S3RemoteServerTest : StringSpec() {
         "get commit fails if metadata is missing properties" {
             val response: HeadObjectResponse = mockk()
             every { response.metadata() } returns mapOf("com.datadatdat" to "{}")
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3
             val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
@@ -236,7 +236,7 @@ class S3RemoteServerTest : StringSpec() {
         "get commit succeeds" {
             val response: HeadObjectResponse = mockk()
             every { response.metadata() } returns mapOf("com.datadatdat" to "{\"properties\":{\"a\":\"b\"}}")
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3
             val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
@@ -245,7 +245,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "get commit returns null on NoSuchKey exception" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } throws NoSuchKeyException.builder().build()
             every { server.getClient(any(), any()) } returns s3
             val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
@@ -253,7 +253,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "get commit returns null on 404 exception" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             val exception = S3Exception.builder().statusCode(404).build()
             every { s3.headObject(any<HeadObjectRequest>()) } throws exception
             every { server.getClient(any(), any()) } returns s3
@@ -262,7 +262,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "get commit fails on other exceptions" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } throws S3Exception.builder().statusCode(500).build()
             every { server.getClient(any(), any()) } returns s3
             shouldThrow<S3Exception> {
@@ -281,7 +281,7 @@ class S3RemoteServerTest : StringSpec() {
         "get metadata content succeeds" {
             val response: GetObjectResponse = mockk()
             val responseStream = ResponseInputStream(response, ByteArrayInputStream("test".toByteArray()))
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.getObject(any<GetObjectRequest>()) } returns responseStream
             every { server.getClient(any(), any()) } returns s3
             val result = server.getMetadataContent(mapOf("bucket" to "bucket", "path" to "path"), emptyMap())
@@ -289,7 +289,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "get metadata content returns empty string on NoSuchKey error" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.getObject(any<GetObjectRequest>()) } throws NoSuchKeyException.builder().build()
             every { server.getClient(any(), any()) } returns s3
             val result = server.getMetadataContent(mapOf("bucket" to "bucket", "path" to "path"), emptyMap())
@@ -297,7 +297,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "get metadata content returns empty string on 404 error" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.getObject(any<GetObjectRequest>()) } throws S3Exception.builder().statusCode(404).build()
             every { server.getClient(any(), any()) } returns s3
             val result = server.getMetadataContent(mapOf("bucket" to "bucket", "path" to "path"), emptyMap())
@@ -305,7 +305,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "get metadata content fails on unknown exception" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.getObject(any<GetObjectRequest>()) } throws S3Exception.builder().statusCode(500).build()
             every { server.getClient(any(), any()) } returns s3
             shouldThrow<S3Exception> {
@@ -339,7 +339,7 @@ class S3RemoteServerTest : StringSpec() {
             every { response.contentLength() } returns currentContent.length.toLong()
             val inputStream = ByteArrayInputStream(currentContent.toByteArray())
             val responseStream = ResponseInputStream(response, inputStream)
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.getObject(any<GetObjectRequest>()) } returns responseStream
             every { server.getClient(any(), any()) } returns s3
             val slot = slot<RequestBody>()
@@ -360,7 +360,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "append metadata treats NoSuchKey as empty" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.getObject(any<GetObjectRequest>()) } throws NoSuchKeyException.builder().build()
             every { server.getClient(any(), any()) } returns s3
             val slot = slot<RequestBody>()
@@ -381,7 +381,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "append metadata treats 404 as empty" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.getObject(any<GetObjectRequest>()) } throws S3Exception.builder().statusCode(404).build()
             every { server.getClient(any(), any()) } returns s3
             val slot = slot<RequestBody>()
@@ -402,7 +402,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "append metadata passes other exceptions through" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.getObject(any<GetObjectRequest>()) } throws S3Exception.builder().statusCode(403).build()
             every { server.getClient(any(), any()) } returns s3
 
@@ -416,7 +416,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "update metadata replaces content" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { server.getClient(any(), any()) } returns s3
             every { server.listCommits(any(), any(), any()) } returns
                 listOf(
@@ -443,18 +443,24 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "sync data start returns data object" {
-            every { server.getClient(any(), any()) } returns mockk()
+            every { server.getClient(any(), any()) } returns mockk(relaxUnitFun = true)
             val data = server.syncDataStart(operation) as S3RemoteServer.S3Operation
             data.bucket shouldBe "bucket"
             data.key shouldBe "path/commit"
         }
 
-        "sync data end does nothing" {
+        "sync data end closes s3 client" {
+            every { server.getClient(any(), any()) } returns mockk(relaxUnitFun = true)
+            val data = S3RemoteServer.S3Operation(provider = server, operation = operation)
+            server.syncDataEnd(operation, data, true)
+        }
+
+        "sync data end handles null data" {
             server.syncDataEnd(operation, null, true)
         }
 
         "pull archive writes contents to file" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { server.getClient(any(), any()) } returns s3
             val data =
                 S3RemoteServer.S3Operation(
@@ -473,7 +479,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "push archive succeeds" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { server.getClient(any(), any()) } returns s3
             val data =
                 S3RemoteServer.S3Operation(
@@ -491,7 +497,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "push metadata with update calls update metadata" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { server.getClient(any(), any()) } returns s3
             val requestSlot = slot<PutObjectRequest>()
             every { s3.putObject(capture(requestSlot), any<RequestBody>()) } returns mockk()
@@ -509,7 +515,7 @@ class S3RemoteServerTest : StringSpec() {
         }
 
         "push metadata without update calls append metadata" {
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { server.getClient(any(), any()) } returns s3
             val requestSlot = slot<PutObjectRequest>()
             every { s3.putObject(capture(requestSlot), any<RequestBody>()) } returns mockk()
@@ -553,7 +559,7 @@ class S3RemoteServerTest : StringSpec() {
         "get commit with null metadata returns null" {
             val response: HeadObjectResponse = mockk()
             every { response.metadata() } returns null
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3
 
@@ -564,7 +570,7 @@ class S3RemoteServerTest : StringSpec() {
         "get commit with metadata missing properties key" {
             val response: HeadObjectResponse = mockk()
             every { response.metadata() } returns mapOf("com.datadatdat" to "{\"someOtherKey\":\"value\"}")
-            val s3: S3Client = mockk()
+            val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3
 

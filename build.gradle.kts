@@ -14,7 +14,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.github.ben-manes:gradle-versions-plugin:0.53.0")
+        classpath("com.github.ben-manes:gradle-versions-plugin:0.54.0")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.20")
     }
 }

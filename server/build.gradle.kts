@@ -20,7 +20,7 @@ dependencies {
 	implementation(kotlin("stdlib"))
 	implementation("com.datadatdat:remote-sdk:1.8.7")
 	implementation("com.google.code.gson:gson:2.14.0")
-	implementation("software.amazon.awssdk:s3:2.42.38")
+	implementation("software.amazon.awssdk:s3:2.42.39")
 	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
 	testImplementation("io.mockk:mockk:1.14.9")
 }// Jar configuration

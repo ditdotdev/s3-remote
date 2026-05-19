@@ -47,8 +47,6 @@ import java.io.SequenceInputStream
  */
 class S3RemoteServer : ArchiveRemote() {
     private val metadataProp = "com.datadatdat"
-    internal val gson = GsonBuilder().create()
-    internal val util = RemoteServerUtil()
 
     override fun getProvider(): String = "s3"
 
@@ -79,6 +77,9 @@ class S3RemoteServer : ArchiveRemote() {
 
     /**
      * Get an instance of the S3 client based on the remote configuration and parameters. Public for testing purposes.
+     *
+     * The caller owns the returned [S3Client] and is responsible for closing it (e.g. via `use { ... }`). Every
+     * internal use of this function wraps the result in `.use { ... }` for that reason.
      */
     fun getClient(
         remote: Map<String, Any>,
@@ -153,30 +154,28 @@ class S3RemoteServer : ArchiveRemote() {
     internal fun getMetadataContent(
         remote: Map<String, Any>,
         parameters: Map<String, Any>,
-    ): InputStream {
-        val s3 = getClient(remote, parameters)
-        try {
-            val (bucket, key) = getPath(remote)
-            val request =
-                GetObjectRequest
-                    .builder()
-                    .bucket(bucket)
-                    .key(getMetadataKey(key))
-                    .build()
-            val bytes = s3.getObject(request).use { it.readAllBytes() }
-            return ByteArrayInputStream(bytes)
-        } catch (e: NoSuchKeyException) {
-            return ByteArrayInputStream("".toByteArray())
-        } catch (e: S3Exception) {
-            if (e.statusCode() == 404) {
-                return ByteArrayInputStream("".toByteArray())
-            } else {
-                throw e
+    ): InputStream =
+        getClient(remote, parameters).use { s3 ->
+            try {
+                val (bucket, key) = getPath(remote)
+                val request =
+                    GetObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(getMetadataKey(key))
+                        .build()
+                val bytes = s3.getObject(request).use { it.readAllBytes() }
+                ByteArrayInputStream(bytes)
+            } catch (e: NoSuchKeyException) {
+                ByteArrayInputStream("".toByteArray())
+            } catch (e: S3Exception) {
+                if (e.statusCode() == 404) {
+                    ByteArrayInputStream("".toByteArray())
+                } else {
+                    throw e
+                }
             }
-        } finally {
-            s3.close()
         }
-    }
 
     /**
      * Get the metadata for a single commit. This is stored as a user property on the object with the key
@@ -229,30 +228,36 @@ class S3RemoteServer : ArchiveRemote() {
         parameters: Map<String, Any>,
         tags: List<Pair<String, String?>>,
     ): List<Pair<String, Map<String, Any>>> {
-        val ret = mutableListOf<Pair<String, Map<String, Any>>>()
+        // `getMetadataContent` eagerly reads + closes the underlying S3 stream,
+        // returning an in-memory stream. We still close it for hygiene, but avoid
+        // Kotlin's `Closeable?.use` extension whose null-receiver branch can never
+        // be exercised (we always pass non-null).
         val metadata = getMetadataContent(remote, parameters)
-
-        try {
-            for (line in metadata.bufferedReader().lines()) {
-                if (line != "") {
+        val text =
+            try {
+                String(metadata.readBytes(), Charsets.UTF_8)
+            } finally {
+                metadata.close()
+            }
+        val lines = if (text.isEmpty()) emptyList() else text.split('\n')
+        return util.sortDescending(
+            lines.mapNotNull { line ->
+                if (line.isEmpty()) {
+                    null
+                } else {
                     val result: Map<String, Any> = gson.fromJson(line, object : TypeToken<Map<String, Any>>() {}.type)
-                    val id = result.get("id")
-                    val properties = result.get("properties")
-                    if (id != null && properties != null) {
-                        id as String
-                        @Suppress("UNCHECKED_CAST")
-                        properties as Map<String, Any>
-                        if (util.matchTags(properties, tags)) {
-                            ret.add(id to properties)
-                        }
+                    val id = result.get("id") as? String
+
+                    @Suppress("UNCHECKED_CAST")
+                    val properties = result.get("properties") as? Map<String, Any>
+                    if (id != null && properties != null && util.matchTags(properties, tags)) {
+                        id to properties
+                    } else {
+                        null
                     }
                 }
-            }
-        } finally {
-            metadata.close()
-        }
-
-        return util.sortDescending(ret)
+            },
+        )
     }
 
     internal fun appendMetadata(
@@ -271,9 +276,14 @@ class S3RemoteServer : ArchiveRemote() {
                         .bucket(bucket)
                         .key(getMetadataKey(key))
                         .build()
-                val responseStream = s3.getObject(request)
-                length = responseStream.response().contentLength()
-                currentMetadata = responseStream
+                // Read the entire body eagerly inside `use` so the underlying HTTP connection
+                // is always closed, even if `response()` or `contentLength()` throws.
+                val bytes =
+                    s3.getObject(request).use { responseStream ->
+                        length = responseStream.response()?.contentLength() ?: 0L
+                        responseStream.readAllBytes()
+                    }
+                currentMetadata = ByteArrayInputStream(bytes)
             } catch (e: NoSuchKeyException) {
                 currentMetadata = ByteArrayInputStream("".toByteArray())
             } catch (e: S3Exception) {
@@ -419,5 +429,13 @@ class S3RemoteServer : ArchiveRemote() {
                 appendMetadata(operation.remote, operation.parameters, json)
             }
         }
+    }
+
+    // `gson` and `util` are stateless utilities; hoisting them to the companion
+    // object avoids the latent bug of mutable per-instance state and the small
+    // per-instance allocation overhead.
+    companion object {
+        internal val gson: com.google.gson.Gson = GsonBuilder().create()
+        internal val util: RemoteServerUtil = RemoteServerUtil()
     }
 }

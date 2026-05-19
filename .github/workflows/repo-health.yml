@@ -1,0 +1,20 @@
+name: Repo Health
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  health:
+    # NOTE: pinned to feat/kotlin-support for the Kotlin rollout.
+    # Will be updated to @master once datadatdat/.github PR #5 merges.
+    uses: datadatdat/.github/.github/workflows/repo-health.yml@feat/kotlin-support
+    with:
+      language: kotlin
+      coverage-floor: 100
+      max-cyclomatic: 25
+      mode: warn
+    secrets:
+      GO_MODULES_TOKEN: ${{ secrets.GO_MODULES_TOKEN }}

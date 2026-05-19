@@ -39,8 +39,26 @@ import software.amazon.awssdk.services.s3.model.S3Exception
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.InputStream
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.IllegalArgumentException
 import kotlin.io.path.createTempFile
+
+/**
+ * An [InputStream] wrapper that records every call to [close] so tests can verify
+ * resource-cleanup invariants. Using a real tracking stream rather than relying on
+ * [io.mockk.mockk]'s auto-stubbing of `close()` (which silently masks leaks).
+ */
+private class TrackingInputStream(
+    delegate: InputStream,
+) : java.io.FilterInputStream(delegate) {
+    val closeCount = AtomicInteger(0)
+
+    override fun close() {
+        closeCount.incrementAndGet()
+        super.close()
+    }
+}
 
 class S3RemoteServerTest : StringSpec() {
     @SpyK
@@ -534,12 +552,12 @@ class S3RemoteServerTest : StringSpec() {
 
         // Coverage tests for uncovered branches
 
-        "gson property is accessible" {
-            server.gson shouldNotBe null
+        "gson companion property is accessible" {
+            S3RemoteServer.gson shouldNotBe null
         }
 
-        "util property is accessible" {
-            server.util shouldNotBe null
+        "util companion property is accessible" {
+            S3RemoteServer.util shouldNotBe null
         }
 
         "validate parameters with null input returns empty map" {
@@ -603,6 +621,117 @@ class S3RemoteServerTest : StringSpec() {
 
             val result = server.listCommits(emptyMap(), emptyMap(), emptyList())
             result.size shouldBe 1
+        }
+
+        "list commits closes metadata stream when parsing throws" {
+            // Exercises the exception path: malformed JSON triggers a gson parse
+            // exception mid-loop; the stream must still be closed.
+            val tracker = TrackingInputStream(ByteArrayInputStream("not-valid-json\n".toByteArray()))
+            every { server.getMetadataContent(any(), any()) } returns tracker
+            shouldThrow<com.google.gson.JsonSyntaxException> {
+                server.listCommits(emptyMap(), emptyMap(), emptyList())
+            }
+            // BufferedReader.readLines() also closes via reader → stream chain,
+            // so >= 1 close is sufficient evidence of cleanup.
+            (tracker.closeCount.get() >= 1) shouldBe true
+        }
+
+        "list commits propagates exceptions when read throws" {
+            // A read failure must surface to the caller, not be swallowed.
+            val failingStream =
+                object : InputStream() {
+                    override fun read(): Int = throw java.io.IOException("read failed")
+                }
+            every { server.getMetadataContent(any(), any()) } returns failingStream
+            shouldThrow<java.io.IOException> {
+                server.listCommits(emptyMap(), emptyMap(), emptyList())
+            }
+        }
+
+        // Resource-cleanup verification (issue #207, finding #1)
+        //
+        // Verify `appendMetadata` always closes the `ResponseInputStream` it gets
+        // back from `s3.getObject`. Uses a real tracking stream rather than relying
+        // on `mockk(relaxUnitFun = true)` which silently auto-stubs `close()` and
+        // would hide a leak.
+
+        "append metadata closes the response input stream on success" {
+            val currentContent = "{\"id\":\"a\",\"properties\":{}}\n"
+            val response: GetObjectResponse = mockk(relaxed = true)
+            every { response.contentLength() } returns currentContent.length.toLong()
+            val tracker = TrackingInputStream(ByteArrayInputStream(currentContent.toByteArray()))
+            val responseStream = ResponseInputStream(response, tracker)
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { s3.getObject(any<GetObjectRequest>()) } returns responseStream
+            every { server.getClient(any(), any()) } returns s3
+            every { s3.putObject(any<PutObjectRequest>(), any<RequestBody>()) } returns mockk()
+
+            server.appendMetadata(
+                mapOf("bucket" to "bucket", "path" to "path"),
+                emptyMap(),
+                "{\"id\":\"b\",\"properties\":{}}",
+            )
+
+            tracker.closeCount.get() shouldBe 1
+        }
+
+        "append metadata closes the response stream even when contentLength throws" {
+            val response: GetObjectResponse = mockk(relaxed = true)
+            // Simulate `response()` returning a response whose `contentLength()`
+            // throws — the response stream MUST still be closed (resource-leak
+            // shape from issue #207).
+            every { response.contentLength() } throws RuntimeException("boom")
+            val tracker = TrackingInputStream(ByteArrayInputStream("ignored".toByteArray()))
+            val responseStream = ResponseInputStream(response, tracker)
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { s3.getObject(any<GetObjectRequest>()) } returns responseStream
+            every { server.getClient(any(), any()) } returns s3
+
+            shouldThrow<RuntimeException> {
+                server.appendMetadata(
+                    mapOf("bucket" to "bucket", "path" to "path"),
+                    emptyMap(),
+                    "{\"id\":\"b\",\"properties\":{}}",
+                )
+            }
+            tracker.closeCount.get() shouldBe 1
+        }
+
+        // Null-safety verification (issue #207, finding #2)
+        //
+        // `responseStream.response()` returning null must not NPE; the safe call
+        // should fall back to a length of 0.
+
+        "append metadata handles null response without NPE" {
+            // Mocks the (final) ResponseInputStream itself so `.response()` returns
+            // null, exercising the `?.` safe-call. Without the safe-call this
+            // would NPE on `.contentLength()`.
+            val responseStream: ResponseInputStream<GetObjectResponse> = mockk(relaxed = true)
+            every { responseStream.response() } returns null
+            every { responseStream.readAllBytes() } returns ByteArray(0)
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { s3.getObject(any<GetObjectRequest>()) } returns responseStream
+            every { server.getClient(any(), any()) } returns s3
+            val slot = slot<RequestBody>()
+            every { s3.putObject(any<PutObjectRequest>(), capture(slot)) } returns mockk()
+
+            // Must complete without NPE
+            server.appendMetadata(
+                mapOf("bucket" to "bucket", "path" to "path"),
+                emptyMap(),
+                "{\"id\":\"b\",\"properties\":{}}",
+            )
+
+            // The response stream must still be closed even on the null-response path.
+            verify { responseStream.close() }
+
+            val newContent =
+                slot.captured
+                    .contentStreamProvider()
+                    .newStream()
+                    .bufferedReader()
+                    .use(BufferedReader::readText)
+            newContent shouldBe "{\"id\":\"b\",\"properties\":{}}\n"
         }
     }
 }

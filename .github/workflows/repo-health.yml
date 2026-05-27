@@ -11,8 +11,8 @@ jobs:
     uses: datadatdat/.github/.github/workflows/repo-health.yml@master
     with:
       language: kotlin
-      coverage-floor: 100
+      coverage-floor: 90
       max-cyclomatic: 25
-      mode: warn
+      mode: block
     secrets:
       GO_MODULES_TOKEN: ${{ secrets.GO_MODULES_TOKEN }}

@@ -10,8 +10,18 @@ name: Release
 on: create
 
 jobs:
+  health:
+    uses: datadatdat/.github/.github/workflows/repo-health.yml@master
+    with:
+      language: kotlin
+      coverage-floor: 90
+      mode: block
+    secrets:
+      GO_MODULES_TOKEN: ${{ secrets.GO_MODULES_TOKEN }}
+
   publish:
     name: Test and publish
+    needs: health
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

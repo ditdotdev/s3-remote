@@ -22,7 +22,7 @@ dependencies {
 	implementation("com.google.code.gson:gson:2.14.0")
 	implementation("software.amazon.awssdk:s3:2.45.0")
 	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
-	testImplementation("io.mockk:mockk:1.14.9")
+	testImplementation("io.mockk:mockk:1.14.11")
 }// Jar configuration
 group = "com.datadatdat"
 version = when(project.hasProperty("version")) {

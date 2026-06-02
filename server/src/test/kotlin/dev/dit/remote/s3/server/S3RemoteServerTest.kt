@@ -1,12 +1,12 @@
 /*
- * Copyright Datadatdat.
+ * Copyright Dit.
  */
 
-package com.datadatdat.remote.s3.server
+package dev.dit.remote.s3.server
 
-import com.datadatdat.remote.RemoteOperation
-import com.datadatdat.remote.RemoteOperationType
-import com.datadatdat.remote.RemoteProgress
+import dev.dit.remote.RemoteOperation
+import dev.dit.remote.RemoteOperationType
+import dev.dit.remote.RemoteProgress
 import io.kotlintest.TestCase
 import io.kotlintest.TestCaseOrder
 import io.kotlintest.TestResult
@@ -243,7 +243,7 @@ class S3RemoteServerTest : StringSpec() {
 
         "get commit fails if metadata is missing properties" {
             val response: HeadObjectResponse = mockk()
-            every { response.metadata() } returns mapOf("com.datadatdat" to "{}")
+            every { response.metadata() } returns mapOf("dev.dit" to "{}")
             val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3
@@ -253,7 +253,7 @@ class S3RemoteServerTest : StringSpec() {
 
         "get commit succeeds" {
             val response: HeadObjectResponse = mockk()
-            every { response.metadata() } returns mapOf("com.datadatdat" to "{\"properties\":{\"a\":\"b\"}}")
+            every { response.metadata() } returns mapOf("dev.dit" to "{\"properties\":{\"a\":\"b\"}}")
             val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3
@@ -288,12 +288,12 @@ class S3RemoteServerTest : StringSpec() {
             }
         }
 
-        "get metadata key returns datadatdat if path is null" {
-            server.getMetadataKey(null) shouldBe "datadatdat"
+        "get metadata key returns dit if path is null" {
+            server.getMetadataKey(null) shouldBe "dit"
         }
 
-        "get metadata key returns path/datadatdat if path is not null" {
-            server.getMetadataKey("path") shouldBe "path/datadatdat"
+        "get metadata key returns path/dit if path is not null" {
+            server.getMetadataKey("path") shouldBe "path/dit"
         }
 
         "get metadata content succeeds" {
@@ -525,7 +525,7 @@ class S3RemoteServerTest : StringSpec() {
 
             requestSlot.captured.bucket() shouldBe "bucket"
             requestSlot.captured.key() shouldBe "path/commit"
-            requestSlot.captured.metadata()["com.datadatdat"] shouldBe "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}"
+            requestSlot.captured.metadata()["dev.dit"] shouldBe "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}"
 
             verify {
                 server.updateMetadata(any(), any(), "commit", mapOf("a" to "b"))
@@ -543,7 +543,7 @@ class S3RemoteServerTest : StringSpec() {
 
             requestSlot.captured.bucket() shouldBe "bucket"
             requestSlot.captured.key() shouldBe "path/commit"
-            requestSlot.captured.metadata()["com.datadatdat"] shouldBe "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}"
+            requestSlot.captured.metadata()["dev.dit"] shouldBe "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}"
 
             verify {
                 server.appendMetadata(any(), any(), "{\"id\":\"commit\",\"properties\":{\"a\":\"b\"}}")
@@ -587,7 +587,7 @@ class S3RemoteServerTest : StringSpec() {
 
         "get commit with metadata missing properties key" {
             val response: HeadObjectResponse = mockk()
-            every { response.metadata() } returns mapOf("com.datadatdat" to "{\"someOtherKey\":\"value\"}")
+            every { response.metadata() } returns mapOf("dev.dit" to "{\"someOtherKey\":\"value\"}")
             val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } returns response
             every { server.getClient(any(), any()) } returns s3

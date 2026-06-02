@@ -1,14 +1,14 @@
 /*
- * Copyright Datadatdat.
+ * Copyright Dit.
  */
 
-package com.datadatdat.remote.s3.server
+package dev.dit.remote.s3.server
 
-import com.datadatdat.remote.RemoteOperation
-import com.datadatdat.remote.RemoteServerUtil
-import com.datadatdat.remote.archive.ArchiveRemote
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
+import dev.dit.remote.RemoteOperation
+import dev.dit.remote.RemoteServerUtil
+import dev.dit.remote.archive.ArchiveRemote
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
@@ -33,7 +33,7 @@ import java.io.SequenceInputStream
  *      s3://bucket/path/to/repo/3583-4053-598ea-298fa
  *
  * Within each commit sub-directory, there is .tar.gz file for each volume. The metadata for each commit is stored
- * as metadata for the object, as well in a 'datadatdat' file at the root of the repository, with once line per commit. We
+ * as metadata for the object, as well in a 'dit' file at the root of the repository, with once line per commit. We
  * do this for a few reasons:
  *
  *      * Storing it in object metdata is inefficient, as there's no way to fetch the metadata of multiple objects
@@ -46,7 +46,7 @@ import java.io.SequenceInputStream
  * Properly solving them would require a more sophisticated provider with server-side logic.
  */
 class S3RemoteServer : ArchiveRemote() {
-    private val metadataProp = "com.datadatdat"
+    private val metadataProp = "dev.dit"
 
     override fun getProvider(): String = "s3"
 
@@ -137,14 +137,14 @@ class S3RemoteServer : ArchiveRemote() {
     }
 
     /**
-     * Gets the path to the datadatdat repo metadata file, which is either in the root of the bucket (if the path is
+     * Gets the path to the dit repo metadata file, which is either in the root of the bucket (if the path is
      * null) or within the path directory.
      */
     internal fun getMetadataKey(key: String?): String =
         if (key == null) {
-            "datadatdat"
+            "dit"
         } else {
-            "$key/datadatdat"
+            "$key/dit"
         }
 
     /**
@@ -179,7 +179,7 @@ class S3RemoteServer : ArchiveRemote() {
 
     /**
      * Get the metadata for a single commit. This is stored as a user property on the object with the key
-     * "com.datadatdat". For historical reasons, we keep the metadata within the "properties" sub-object. This
+     * "dev.dit". For historical reasons, we keep the metadata within the "properties" sub-object. This
      * matches how it's stored in the top-level metadata file.
      */
     override fun getCommit(

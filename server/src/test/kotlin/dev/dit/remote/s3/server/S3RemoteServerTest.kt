@@ -66,7 +66,7 @@ class S3RemoteServerTest : StringSpec() {
 
     val operation =
         RemoteOperation(
-            updateProgress = { _: RemoteProgress, _: String?, _: Int? -> Unit },
+            updateProgress = { _: RemoteProgress, _: String?, _: Int? -> },
             remote = mapOf("bucket" to "bucket", "path" to "path"),
             parameters = emptyMap(),
             operationId = "operation",

@@ -262,6 +262,54 @@ class S3RemoteServerTest : StringSpec() {
             result!!["a"] shouldBe "b"
         }
 
+        "get commit succeeds with legacy com.dit key" {
+            val response: HeadObjectResponse = mockk()
+            every { response.metadata() } returns mapOf("com.dit" to "{\"properties\":{\"a\":\"b\"}}")
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { s3.headObject(any<HeadObjectRequest>()) } returns response
+            every { server.getClient(any(), any()) } returns s3
+            val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
+            result shouldNotBe null
+            result!!["a"] shouldBe "b"
+        }
+
+        "get commit succeeds with legacy com.datadatdat key" {
+            val response: HeadObjectResponse = mockk()
+            every { response.metadata() } returns mapOf("com.datadatdat" to "{\"properties\":{\"a\":\"b\"}}")
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { s3.headObject(any<HeadObjectRequest>()) } returns response
+            every { server.getClient(any(), any()) } returns s3
+            val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
+            result shouldNotBe null
+            result!!["a"] shouldBe "b"
+        }
+
+        "get commit prefers canonical dev.dit over legacy keys" {
+            val response: HeadObjectResponse = mockk()
+            every { response.metadata() } returns
+                mapOf(
+                    "dev.dit" to "{\"properties\":{\"a\":\"canonical\"}}",
+                    "com.dit" to "{\"properties\":{\"a\":\"legacy-dit\"}}",
+                    "com.datadatdat" to "{\"properties\":{\"a\":\"legacy-ddd\"}}",
+                )
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { s3.headObject(any<HeadObjectRequest>()) } returns response
+            every { server.getClient(any(), any()) } returns s3
+            val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
+            result shouldNotBe null
+            result!!["a"] shouldBe "canonical"
+        }
+
+        "get commit skips empty metadata values and falls through to null" {
+            val response: HeadObjectResponse = mockk()
+            every { response.metadata() } returns mapOf("dev.dit" to "")
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { s3.headObject(any<HeadObjectRequest>()) } returns response
+            every { server.getClient(any(), any()) } returns s3
+            val result = server.getCommit(mapOf("bucket" to "bucket", "path" to "path"), emptyMap(), "id")
+            result shouldBe null
+        }
+
         "get commit returns null on NoSuchKey exception" {
             val s3: S3Client = mockk(relaxUnitFun = true)
             every { s3.headObject(any<HeadObjectRequest>()) } throws NoSuchKeyException.builder().build()

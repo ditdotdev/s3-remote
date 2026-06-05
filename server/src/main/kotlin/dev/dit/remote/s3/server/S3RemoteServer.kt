@@ -46,7 +46,15 @@ import java.io.SequenceInputStream
  * Properly solving them would require a more sophisticated provider with server-side logic.
  */
 class S3RemoteServer : ArchiveRemote() {
+    // Canonical S3 user-metadata key under which per-commit metadata is written. Matches
+    // the Kotlin Maven group / reverse-DNS "dev.dit".
     private val metadataProp = "dev.dit"
+
+    // S3 user-metadata keys to try, in order, when reading per-commit metadata. The
+    // canonical key is first, followed by legacy keys written before the dit rename
+    // ("com.dit") and before that ("com.datadatdat"), so existing S3 remotes keep
+    // working without a re-push.
+    private val metadataPropKeys = listOf(metadataProp, "com.dit", "com.datadatdat")
 
     override fun getProvider(): String = "s3"
 
@@ -178,9 +186,10 @@ class S3RemoteServer : ArchiveRemote() {
         }
 
     /**
-     * Get the metadata for a single commit. This is stored as a user property on the object with the key
-     * "dev.dit". For historical reasons, we keep the metadata within the "properties" sub-object. This
-     * matches how it's stored in the top-level metadata file.
+     * Get the metadata for a single commit. This is stored as a user property on the object under the
+     * canonical key "dev.dit", with fallback to the legacy keys "com.dit" and "com.datadatdat" for
+     * remotes pushed before the dit rename. For historical reasons, we keep the metadata within the
+     * "properties" sub-object. This matches how it's stored in the top-level metadata file.
      */
     override fun getCommit(
         remote: Map<String, Any>,
@@ -198,10 +207,13 @@ class S3RemoteServer : ArchiveRemote() {
                         .build()
                 val response = s3.headObject(request)
                 val userMetadata = response.metadata()
-                if (userMetadata == null || !userMetadata.containsKey(metadataProp)) {
-                    return null
-                }
-                val metadata: Map<String, Any> = gson.fromJson(userMetadata[metadataProp], object : TypeToken<Map<String, Any>>() {}.type)
+                val metadataJson =
+                    metadataPropKeys
+                        .asSequence()
+                        .mapNotNull { userMetadata?.get(it) }
+                        .firstOrNull { it.isNotEmpty() }
+                        ?: return null
+                val metadata: Map<String, Any> = gson.fromJson(metadataJson, object : TypeToken<Map<String, Any>>() {}.type)
 
                 if (!metadata.containsKey("properties")) {
                     return null

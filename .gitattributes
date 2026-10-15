@@ -1,0 +1,8 @@
+# Store and check out files with LF so they keep working when copied into
+# Linux containers. text=auto lets git detect binaries on its own.
+* text=auto eol=lf
+
+# Windows batch files (gradlew.bat) are committed with CRLF, exactly as Gradle
+# ships them and as Dependabot wrapper bumps write them. Leave them untouched
+# so the working tree never differs from the index on Windows checkouts.
+*.bat -text

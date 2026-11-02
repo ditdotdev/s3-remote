@@ -22,6 +22,8 @@ import software.amazon.awssdk.services.s3.model.S3Exception
 import java.io.ByteArrayInputStream
 import java.io.Closeable
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.SequenceInputStream
 
@@ -386,16 +388,37 @@ class S3RemoteServer : ArchiveRemote() {
         archive: File,
     ) {
         val data = operationData as S3Operation
-        val request =
-            GetObjectRequest
-                .builder()
-                .bucket(data.bucket)
-                .key("${data.key}/$volume.tar.gz")
-                .build()
-        val obj = data.s3.getObject(request)
-        obj.use { input ->
-            archive.outputStream().use { output ->
-                input.copyTo(output)
+        val key = "${data.key}/$volume.tar.gz"
+        // The SDK retries a failed request, not a response body that dies half way
+        // through; under load S3 resets some long downloads ("Connection reset",
+        // ditdotdev/dit#264). Resume from the bytes already on disk with a Range
+        // request, a bounded number of times.
+        var written = 0L
+        var attempt = 1
+        while (true) {
+            val builder = GetObjectRequest.builder().bucket(data.bucket).key(key)
+            if (written > 0) builder.range("bytes=$written-")
+            try {
+                data.s3.getObject(builder.build()).use { input ->
+                    FileOutputStream(archive, written > 0).use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            output.write(buffer, 0, n)
+                            written += n
+                        }
+                    }
+                }
+                return
+            } catch (e: IOException) {
+                if (attempt >= PULL_ARCHIVE_ATTEMPTS) throw e
+                attempt++
+            } catch (e: S3Exception) {
+                // Resuming at exactly the object's length: the previous body was
+                // complete and only its end-of-stream was lost.
+                if (written > 0 && e.statusCode() == HTTP_RANGE_NOT_SATISFIABLE) return
+                throw e
             }
         }
     }
@@ -448,5 +471,9 @@ class S3RemoteServer : ArchiveRemote() {
     companion object {
         internal val gson: com.google.gson.Gson = GsonBuilder().create()
         internal val util: RemoteServerUtil = RemoteServerUtil()
+
+        /** How many times [pullArchive] opens the object before giving up on a reset body. */
+        internal const val PULL_ARCHIVE_ATTEMPTS = 3
+        private const val HTTP_RANGE_NOT_SATISFIABLE = 416
     }
 }

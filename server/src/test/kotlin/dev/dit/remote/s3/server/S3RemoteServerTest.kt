@@ -38,7 +38,9 @@ import software.amazon.awssdk.services.s3.model.S3Exception
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
+import java.net.SocketException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.IllegalArgumentException
 import kotlin.io.path.createTempFile
@@ -56,6 +58,35 @@ private class TrackingInputStream(
     override fun close() {
         closeCount.incrementAndGet()
         super.close()
+    }
+}
+
+/**
+ * An [InputStream] that yields [prefix] and then fails the way a reset TCP connection
+ * does while a response body is being read. Both read overloads throw, because the
+ * default `read(ByteArray, Int, Int)` swallows an [IOException] after the first byte.
+ */
+private class ResettingInputStream(
+    private val prefix: ByteArray,
+) : InputStream() {
+    private var pos = 0
+
+    override fun read(): Int {
+        if (pos >= prefix.size) throw SocketException("Connection reset")
+        return prefix[pos++].toInt() and 0xff
+    }
+
+    override fun read(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ): Int {
+        if (len == 0) return 0
+        if (pos >= prefix.size) throw SocketException("Connection reset")
+        val n = minOf(len, prefix.size - pos)
+        System.arraycopy(prefix, pos, b, off, n)
+        pos += n
+        return n
     }
 }
 
@@ -541,6 +572,57 @@ class S3RemoteServerTest : StringSpec() {
 
             val contents = file.readText()
             contents shouldBe "test"
+        }
+
+        // S3 resets long-lived connections under load (ditdotdev/dit#264); the SDK's
+        // retry policy covers the request, not a body that dies half way through.
+        "pull archive resumes after the body is reset mid-stream" {
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { server.getClient(any(), any()) } returns s3
+            val data = S3RemoteServer.S3Operation(provider = server, operation = operation)
+            val requests = mutableListOf<GetObjectRequest>()
+            every { s3.getObject(capture(requests)) } returnsMany
+                listOf(
+                    ResponseInputStream(mockk<GetObjectResponse>(), ResettingInputStream("te".toByteArray())),
+                    ResponseInputStream(mockk<GetObjectResponse>(), ByteArrayInputStream("st".toByteArray())),
+                )
+
+            val file = createTempFile().toFile()
+            server.pullArchive(operation, data, "volume", file)
+
+            file.readText() shouldBe "test"
+            requests.size shouldBe 2
+            requests[0].range() shouldBe null
+            requests[1].range() shouldBe "bytes=2-"
+        }
+
+        "pull archive treats an out-of-range resume as a complete download" {
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { server.getClient(any(), any()) } returns s3
+            val data = S3RemoteServer.S3Operation(provider = server, operation = operation)
+            every { s3.getObject(any<GetObjectRequest>()) } returns
+                ResponseInputStream(mockk<GetObjectResponse>(), ResettingInputStream("test".toByteArray())) andThenThrows
+                S3Exception.builder().statusCode(416).build()
+
+            val file = createTempFile().toFile()
+            server.pullArchive(operation, data, "volume", file)
+
+            file.readText() shouldBe "test"
+        }
+
+        "pull archive gives up after repeated resets" {
+            val s3: S3Client = mockk(relaxUnitFun = true)
+            every { server.getClient(any(), any()) } returns s3
+            val data = S3RemoteServer.S3Operation(provider = server, operation = operation)
+            every { s3.getObject(any<GetObjectRequest>()) } answers {
+                ResponseInputStream(mockk<GetObjectResponse>(), ResettingInputStream("x".toByteArray()))
+            }
+
+            val file = createTempFile().toFile()
+            shouldThrow<IOException> {
+                server.pullArchive(operation, data, "volume", file)
+            }
+            verify(exactly = S3RemoteServer.PULL_ARCHIVE_ATTEMPTS) { s3.getObject(any<GetObjectRequest>()) }
         }
 
         "push archive succeeds" {

@@ -4,7 +4,9 @@
 #
 
 #
-# On creating a new tag, we publish our maven artifacts to the dit maven bucket.
+# On creating a new tag, we release our maven artifacts to Maven Central
+# (namespace dev.dit). The release is automatic and permanent: once Central
+# has validated the upload, the version is published and cannot be changed.
 #
 name: Release
 
@@ -28,14 +30,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
       - name: Build and test
         run: ./gradlew build -Pversion=${GITHUB_REF#refs/tags/}
-      - name: Publish jar to the Dit maven bucket
-        run: >
-          ./gradlew publishAllPublicationsToDitRepository -PmavenBucket=${{ secrets.MAVEN_BUCKET }} -Pversion=${GITHUB_REF#refs/tags/}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      - name: Upload signed jar to Maven Central
-        run: ./gradlew publishToMavenCentral -Pversion=${GITHUB_REF#refs/tags/}
+      - name: Release signed jar to Maven Central
+        run: ./gradlew publishAndReleaseToMavenCentral -Pversion=${GITHUB_REF#refs/tags/}
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

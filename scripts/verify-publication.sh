@@ -35,6 +35,19 @@ failures=0
 fail() { echo "  FAIL: $1"; failures=$((failures + 1)); }
 pass() { echo "  ok:   $1"; }
 
+# dev.dit artifacts are published to and resolved from Maven Central only. The
+# dit-maven S3 bucket (https://maven.dit.dev) is retired; fail if a build file
+# brings it back. git grep exits 0 on a match, 1 on none, and more on error.
+echo "== repositories =="
+retired_rc=0
+retired="$(cd "$ROOT" && git grep -nE 'maven\.dit\.dev|dit-maven|mavenBucket' -- '*.gradle.kts')" || retired_rc=$?
+case "$retired_rc" in
+  0) echo "$retired" | sed 's/^/        /'
+     fail "build files reference the retired dit-maven repository" ;;
+  1) pass "build files use Maven Central only" ;;
+  *) fail "could not search the build files (git grep exit $retired_rc)" ;;
+esac
+
 for artifact in "$@"; do
   dir="$REPO/$GROUP_PATH/$artifact/$VERSION"
   base="$dir/$artifact-$VERSION"

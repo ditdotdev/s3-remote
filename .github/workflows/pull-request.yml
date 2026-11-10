@@ -27,3 +27,5 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
       - name: Build and test
         run: ./gradlew build
+      - name: Verify Maven Central publication
+        run: scripts/verify-publication.sh s3-remote-server

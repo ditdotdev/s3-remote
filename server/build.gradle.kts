@@ -20,7 +20,7 @@ dependencies {
 	implementation("com.google.code.gson:gson:2.15.0")
 	implementation("software.amazon.awssdk:s3:2.57.10")
 	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.2")
-	testImplementation("io.mockk:mockk:1.14.11")
+	testImplementation("io.mockk:mockk:1.14.12")
 }// Jar configuration
 group = "dev.dit"
 version = when(project.hasProperty("version")) {
